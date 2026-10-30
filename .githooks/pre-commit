@@ -1,0 +1,7 @@
+#!/bin/sh
+# Enabled with `npm run hooks:install` (sets core.hooksPath to .githooks).
+# Blocks a commit when the AI framework disagrees with the code or a staged file
+# has no owner. Cross-layer commits are reported, not blocked.
+set -e
+node tools/check-ai.mjs
+node tools/check-ownership.mjs --staged

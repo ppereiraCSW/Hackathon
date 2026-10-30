@@ -1,0 +1,133 @@
+{
+  "comment": "The run chain: the ordered stages that build this project from nothing to a verified demo. Derived from the milestones M0-M6 in docs/PLAN.md. Each stage names its owner agent, what it must deliver, and the checks that prove it is done. tools/chain.mjs runs the checks, reports status, and prints a brief for the next unfinished stage. Commands run from the repo root.",
+  "stages": [
+    {
+      "id": "M0",
+      "title": "Toolchain installed",
+      "owner": "integrator",
+      "dependsOn": [],
+      "goal": "Arm GNU Toolchain and QEMU are installed and reachable by firmware/build.mjs (default paths, or ARM_TOOLCHAIN_BIN / QEMU_BIN).",
+      "deliverables": ["firmware/build.mjs (TOOLCHAIN_BIN, QEMU_BIN)"],
+      "checks": [
+        {
+          "run": "node -e \"import('./firmware/build.mjs').then((m) => { m.gccPath(); m.qemuPath(); console.log('toolchain ok') })\""
+        }
+      ],
+      "skill": "build-and-test"
+    },
+    {
+      "id": "M1",
+      "title": "A429 codec and golden vectors",
+      "owner": "backend",
+      "dependsOn": [],
+      "goal": "Bit-exact ARINC 429 encode/decode in JS, pinned by golden vectors derived twice.",
+      "deliverables": [
+        "backend/src/a429/codec.js",
+        "test/a429.test.mjs",
+        "shared/labels.json (integrator)",
+        "shared/a429-vectors.json via tools/gen-vectors.mjs (integrator)"
+      ],
+      "checks": [{ "run": "node --test test/a429.test.mjs" }],
+      "skill": "build-and-test"
+    },
+    {
+      "id": "M2",
+      "title": "Firmware builds and its words decode correctly",
+      "owner": "embedded",
+      "dependsOn": ["M0", "M1"],
+      "needs": ["toolchain"],
+      "goal": "Bare-metal Cortex-M3 image for QEMU mps2-an385 that parses pad frames on UART1 and emits six A429 words per 50 Hz tick on UART0.",
+      "deliverables": [
+        "firmware/src/startup.c",
+        "firmware/mps2-an385.ld",
+        "firmware/src/uart.h",
+        "firmware/src/pad.h",
+        "firmware/src/flight.h",
+        "firmware/src/a429.h",
+        "firmware/src/main.c"
+      ],
+      "checks": [
+        { "run": "node firmware/build.mjs", "failOn": "warning:" },
+        { "run": "node tools/test-pad-path.mjs", "failOn": "FAIL" }
+      ],
+      "skill": "build-and-test"
+    },
+    {
+      "id": "M3",
+      "title": "Pad reader streams the real gamepad",
+      "owner": "embedded",
+      "dependsOn": ["M2"],
+      "needs": ["toolchain", "windows", "pad"],
+      "manual": "Move each stick and press each button; the live table must show the matching parameter change.",
+      "goal": "host/pad-reader.ps1 reads the gamepad (HID, WinMM fallback) and streams 17-byte frames at 50 Hz to QEMU.",
+      "deliverables": ["host/pad-reader.ps1", "host/test-pad.ps1", "host/test-hid.ps1"],
+      "checks": [{ "run": "node tools/verify-pad-live.mjs --seconds 20" }],
+      "skill": "run-and-verify-demo"
+    },
+    {
+      "id": "M4",
+      "title": "Backend decodes, converts and judges freshness",
+      "owner": "backend",
+      "dependsOn": ["M1"],
+      "goal": "ParamState with watchdog and resync, DisplayConfig, HTTP + SSE server, live and replay ingest.",
+      "deliverables": [
+        "backend/src/state.js",
+        "backend/src/config.js",
+        "backend/src/server.js",
+        "backend/serve.mjs",
+        "test/state.test.mjs"
+      ],
+      "checks": [{ "run": "node --test test/state.test.mjs" }],
+      "skill": "build-and-test"
+    },
+    {
+      "id": "M5",
+      "title": "SFD and config pages",
+      "owner": "frontend",
+      "dependsOn": ["M4"],
+      "manual": "Open /sfd and /config with `node tools/run-all.mjs --replay`; move a slider and see the SFD scale follow; check the STALE/NCD flags.",
+      "goal": "Secondary Flight Display and one slider set per parameter, fed by SSE, with full validity flags.",
+      "deliverables": [
+        "frontend/sfd.html",
+        "frontend/config.html",
+        "frontend/js/sfd.js",
+        "frontend/js/config.js",
+        "frontend/css/app.css",
+        "frontend/css/sfd.css"
+      ],
+      "checks": [{ "run": "node --test --test-name-pattern=\"both pages\" test/e2e.test.mjs" }],
+      "skill": "run-and-verify-demo"
+    },
+    {
+      "id": "M6",
+      "title": "End to end and decoupled replay",
+      "owner": "integrator",
+      "dependsOn": ["M4", "M5"],
+      "goal": "Live TCP ingest reaches the browser; the backend replays a real capture with QEMU and the pad absent.",
+      "deliverables": ["test/e2e.test.mjs", "shared/capture.a429", "tools/run-all.mjs", "tools/capture.mjs"],
+      "checks": [{ "run": "node --test test/e2e.test.mjs" }, { "run": "npm test" }],
+      "skill": "run-and-verify-demo"
+    },
+    {
+      "id": "M7",
+      "title": "Measured 50 Hz",
+      "owner": "embedded",
+      "dependsOn": ["M2"],
+      "needs": ["toolchain"],
+      "goal": "The firmware's real word rate is about 50 Hz, measured, not inferred.",
+      "deliverables": ["firmware/src/main.c (timebase)", "tools/probe-rate.mjs"],
+      "checks": [{ "run": "node tools/probe-rate.mjs 5", "expect": "rate=(49|50)\\.\\d+ Hz" }],
+      "skill": "build-and-test"
+    },
+    {
+      "id": "M8",
+      "title": "AI framework and pipeline consistent",
+      "owner": "integrator",
+      "dependsOn": [],
+      "goal": "Rules, agents, skills, ownership and Claude Code wrappers agree with the code; CI runs the chain.",
+      "deliverables": ["ai/", "AGENTS.md", ".claude/", ".github/workflows/ci.yml", ".githooks/pre-commit"],
+      "checks": [{ "run": "node tools/check-ai.mjs" }],
+      "skill": "commit-and-review"
+    }
+  ]
+}

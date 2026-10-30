@@ -1,0 +1,61 @@
+# CI for the avionics pipeline. Every job is a thin call into tools/ so the same
+# checks run locally: see ai/rules/integrator.md §6 and the run-chain skill.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  framework:
+    name: AI framework and ownership
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Rules, agents, skills and wrappers agree with the code
+        run: node tools/check-ai.mjs
+      - name: Owner of every file changed in this pull request
+        if: github.event_name == 'pull_request'
+        run: node tools/check-ownership.mjs --base origin/${{ github.base_ref }}
+
+  test:
+    name: Tests and software stages (M1, M4, M5, M6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+      - name: Run chain, software stages
+        run: |
+          for s in M1 M4 M5 M6; do node tools/chain.mjs --stage "$s"; done
+
+  firmware:
+    name: Firmware in QEMU (M0, M2, M7)
+    runs-on: ubuntu-latest
+    env:
+      ARM_TOOLCHAIN_BIN: /usr/bin
+      QEMU_BIN: /usr/bin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install Arm GCC and QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi qemu-system-arm
+          arm-none-eabi-gcc --version | head -1
+          qemu-system-arm --version | head -1
+      - name: Toolchain reachable (M0)
+        run: node tools/chain.mjs --stage M0 --require-toolchain
+      - name: Firmware builds clean and its words decode (M2)
+        run: node tools/chain.mjs --stage M2 --require-toolchain
+      - name: Measured rate about 50 Hz (M7)
+        run: node tools/chain.mjs --stage M7 --require-toolchain

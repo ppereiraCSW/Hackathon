@@ -25,6 +25,8 @@ toolchain — see [Prerequisites](#prerequisites).
 
 ## What it does
 
+![Project overview](docs/project-overview.svg)
+
 ```
 USB gamepad ──DirectInput──► host/pad-reader.ps1 ──TCP──► QEMU guest
                                                           │  bare-metal Cortex-M3
@@ -86,7 +88,7 @@ Prize categories: **First to Fly** (first fully working solution), **Extra Mile*
 | Path | What it is |
 |------|------------|
 | `firmware/` | Bare-metal ARM Cortex-M3 firmware for QEMU `mps2-an385`: startup, linker script, CMSDK UART driver, pad frame parser, flight model, A429 encoder. Build with `node firmware/build.mjs`. |
-| `host/` | `pad-reader.ps1` (WinMM → TCP frames) and `test-pad.ps1` (diagnose the pad). PowerShell + .NET only, no npm packages. |
+| `host/` | `pad-reader.ps1` (HID input reports, WinMM fallback → TCP frames), `test-pad.ps1` and `test-hid.ps1` (diagnose the pad). PowerShell + .NET only, no npm packages. |
 | `backend/` | Node 24, zero dependencies. A429 decode, BNR→engineering units, per-label freshness watchdog, display-config store, HTTP + SSE. `node backend/serve.mjs`. |
 | `frontend/` | `sfd.html` (the Secondary Flight Display) and `config.html` (six sliders). Canvas + SVG, no frameworks. |
 | `shared/` | `labels.json` — the 6-label contract shared by firmware and backend; `a429-vectors.json` — golden vectors; `capture.a429` — a real recording used for the decoupled replay. |
@@ -160,7 +162,7 @@ Every claim below is a command you can run.
 
 ```bash
 npm test                             # 38/38 passing
-node tools/test-pad-path.mjs         # 12/12: pad frame -> firmware -> A429 -> backend
+node tools/test-pad-path.mjs         # 16/16: pad frames -> firmware -> A429 -> backend
 node tools/verify-pad-live.mjs       # the REAL gamepad through the real pipeline
 node tools/probe-rate.mjs 5          # ~49.8 Hz measured against a 50 Hz target
 node tools/gen-vectors.mjs           # golden vectors, each derived twice and asserted equal
@@ -177,6 +179,26 @@ What the tests establish:
 - **The decoupling is tested, not claimed** — `--replay` runs the entire display path
   with no QEMU, no gamepad and no serial port, and a test asserts the A429 port is
   not even opened in that mode.
+
+## AI framework
+
+Agents, rules and skills for building this project with AI assistants live in
+[`ai/`](ai/README.md); [`AGENTS.md`](AGENTS.md) is the entry point for any tool.
+One coordinator (integrator) and three layer agents (embedded, backend, frontend)
+each own their paths, plus a read-only reviewer. Every project fact sits in one
+rule file, and scripts fail when a rule drifts from the code.
+
+![AI workflow](docs/ai-workflow.svg)
+
+```bash
+node tools/chain.mjs --all        # the run chain: milestones M0–M8, status of each
+node tools/check-ai.mjs           # rules, agents, skills vs the code
+node tools/check-ownership.mjs    # which agent owns each changed file
+```
+
+CI (`.github/workflows/ci.yml`) runs these, `npm test`, and the firmware build and
+QEMU tests on Linux on every push and pull request. `firmware/build.mjs` accepts
+`ARM_TOOLCHAIN_BIN` and `QEMU_BIN` for toolchains outside the Windows defaults.
 
 ## Working in this repo
 
@@ -203,10 +225,11 @@ user.email = paulo.pereira@criticalsoftware.com
   `.gitignore` covers these. Exception: `shared/capture.a429` is committed on
   purpose — it is the fixture the decoupled replay test runs against.
 - There is no `main` branch on the remote yet; `sandbox` is currently the default.
-- The repo path contains a space (`CRITICAL SOFTWARE, S.A`), which breaks
-  `-Wl,-Map=<path>`. The build script passes it as a separate argument.
+- The repo path may contain spaces, which break `-Wl,-Map=<path>`. The build
+  script passes the path as a separate argument.
 - The gamepad is **DirectInput-only** (`HID\VID_0079&PID_181C`) and exposes **four**
-  axes; XInput cannot see it. Hence the WinMM reader and the derived heading/altitude.
+  axes; XInput cannot see it. Hence the HID reader (WinMM as fallback) and the derived
+  heading/altitude.
 - Nothing in this repo is sent anywhere without asking first.
 
 ## Open questions

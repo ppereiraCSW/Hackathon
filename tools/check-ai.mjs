@@ -1,0 +1,295 @@
+#!/usr/bin/env node
+/**
+ * Keeps the AI framework (ai/, AGENTS.md, .claude/) honest against the code.
+ *
+ * The rules restate facts that live in code: labels, ports, rates, test counts,
+ * file paths. This fails the moment one of them drifts, so a rule can never
+ * quietly disagree with what it describes.
+ *
+ *   node tools/check-ai.mjs           # check; exit 1 on any problem
+ *   node tools/check-ai.mjs --write   # also regenerate the .claude/ wrappers
+ */
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadOwnership, ownerOf } from './check-ownership.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(here, '..');
+const WRITE = process.argv.includes('--write');
+
+const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+const problems = [];
+const fail = (msg) => problems.push(msg);
+
+/* ------------------------------------------------------------- helpers */
+
+/** Minimal YAML frontmatter: `key: value` and `key: [a, b]` lines only. */
+function frontmatter(text) {
+    const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!m) return null;
+    const out = {};
+    for (const line of m[1].split(/\r?\n/)) {
+        const kv = line.match(/^([\w-]+):\s*(.*)$/);
+        if (!kv) continue;
+        const v = kv[2].trim();
+        out[kv[1]] = v.startsWith('[') ? v.slice(1, -1).split(',').map((s) => s.trim()).filter(Boolean) : v;
+    }
+    return out;
+}
+
+function mdFiles(dir) {
+    const out = [];
+    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+        const p = `${dir}/${e.name}`;
+        if (e.isDirectory()) out.push(...mdFiles(p));
+        else if (e.name.endsWith('.md')) out.push(p);
+    }
+    return out;
+}
+
+function grab(file, re, what) {
+    const m = read(file).match(re);
+    if (!m) {
+        fail(`${file}: could not find ${what}`);
+        return null;
+    }
+    return m[1];
+}
+
+/* ----------------------------------------------------------- ownership */
+
+const ownership = loadOwnership(ROOT);
+const tracked = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean);
+const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+})
+    .split('\n')
+    .filter(Boolean);
+for (const f of [...tracked, ...untracked]) {
+    if (!ownerOf(f, ownership)) fail(`ownership: ${f} has no owner in ai/ownership.json`);
+}
+for (const [agent, def] of Object.entries(ownership.agents)) {
+    for (const p of def.owns) {
+        if (!existsSync(join(ROOT, p))) fail(`ownership: ${agent} owns ${p}, which does not exist`);
+    }
+}
+
+/* ------------------------------------------------------ agents, skills */
+
+const skillNames = readdirSync(join(ROOT, 'ai', 'skills'), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name);
+const skills = new Map();
+for (const s of skillNames) {
+    const file = `ai/skills/${s}/SKILL.md`;
+    if (!existsSync(join(ROOT, file))) {
+        fail(`${file}: missing`);
+        continue;
+    }
+    const fm = frontmatter(read(file));
+    if (!fm?.name || !fm?.description) fail(`${file}: frontmatter needs name and description`);
+    else if (fm.name !== s) fail(`${file}: name "${fm.name}" does not match its folder`);
+    skills.set(s, fm ?? {});
+}
+
+const agents = new Map();
+for (const agent of Object.keys(ownership.agents)) {
+    const file = `ai/agents/${agent}.md`;
+    if (!existsSync(join(ROOT, file))) {
+        fail(`${file}: missing (agent listed in ai/ownership.json)`);
+        continue;
+    }
+    const fm = frontmatter(read(file));
+    if (!fm?.name || !fm?.description || !fm?.rules) {
+        fail(`${file}: frontmatter needs name, description, rules`);
+        continue;
+    }
+    if (fm.name !== agent) fail(`${file}: name "${fm.name}" does not match the file name`);
+    for (const r of [...fm.rules, ...(fm.reads_also ?? [])]) {
+        if (!existsSync(join(ROOT, r))) fail(`${file}: rule file ${r} does not exist`);
+    }
+    for (const s of fm.skills ?? []) {
+        if (!skills.has(s)) fail(`${file}: skill ${s} does not exist`);
+    }
+    agents.set(agent, fm);
+}
+for (const f of readdirSync(join(ROOT, 'ai', 'agents'))) {
+    const name = f.replace(/\.md$/, '');
+    if (!ownership.agents[name]) fail(`ai/agents/${f}: agent not listed in ai/ownership.json`);
+}
+
+/* ------------------------------------------------- .claude/ wrappers */
+
+function agentWrapper(name, fm) {
+    const files = [`ai/agents/${name}.md`, ...fm.rules, ...(fm.reads_also ?? [])];
+    return [
+        '---',
+        `name: ${name}`,
+        `description: ${fm.description}`,
+        ...(fm.tools ? [`tools: ${fm.tools}`] : []),
+        '---',
+        '',
+        `Generated by tools/check-ai.mjs --write from \`ai/agents/${name}.md\`. Do not edit.`,
+        '',
+        'Before doing anything else, read these files in full and follow them:',
+        '',
+        ...files.map((f, i) => `${i + 1}. \`${f}\``),
+        '',
+        'Your paths are listed in `ai/ownership.json`. Skills are in',
+        '`ai/skills/<name>/SKILL.md`; read the one a task needs and follow it.',
+        '',
+    ].join('\n');
+}
+
+function skillWrapper(name, fm) {
+    return [
+        '---',
+        `name: ${name}`,
+        `description: ${fm.description}`,
+        '---',
+        '',
+        `Generated by tools/check-ai.mjs --write from \`ai/skills/${name}/SKILL.md\`. Do not edit.`,
+        '',
+        `Read \`ai/skills/${name}/SKILL.md\` in full and follow it. Facts it relies on are in \`ai/rules/\`.`,
+        '',
+    ].join('\n');
+}
+
+const wrappers = [
+    ...[...agents].map(([n, fm]) => [`.claude/agents/${n}.md`, agentWrapper(n, fm)]),
+    ...[...skills].map(([n, fm]) => [`.claude/skills/${n}/SKILL.md`, skillWrapper(n, fm)]),
+];
+for (const [path, want] of wrappers) {
+    const abs = join(ROOT, path);
+    const have = existsSync(abs) ? readFileSync(abs, 'utf8').replace(/\r\n/g, '\n') : null;
+    if (have === want) continue;
+    if (WRITE) {
+        mkdirSync(dirname(abs), { recursive: true });
+        writeFileSync(abs, want);
+        console.log(`[check-ai] wrote ${path}`);
+    } else {
+        fail(`${path}: out of date with its source; run node tools/check-ai.mjs --write`);
+    }
+}
+for (const [dir, known] of [
+    ['.claude/agents', new Set([...agents.keys()].map((n) => `${n}.md`))],
+    ['.claude/skills', new Set(skills.keys())],
+]) {
+    if (!existsSync(join(ROOT, dir))) continue;
+    for (const f of readdirSync(join(ROOT, dir))) {
+        if (!known.has(f)) fail(`${dir}/${f}: no matching source in ai/`);
+    }
+}
+
+/* ------------------------------------------- paths named in the docs */
+
+const docFiles = ['AGENTS.md', ...mdFiles('ai')];
+const TOP = /^(firmware|host|backend|frontend|shared|tools|test|docs|ai|\.claude|\.github|\.githooks)\//;
+for (const f of docFiles) {
+    for (const m of read(f).matchAll(/`([^`\s]+)`/g)) {
+        const p = m[1].replace(/[),.:;]+$/, '');
+        if (!TOP.test(p) || /[<>*{}]/.test(p) || p.startsWith('firmware/build/')) continue;
+        if (!existsSync(join(ROOT, p))) fail(`${f}: names \`${p}\`, which does not exist`);
+    }
+}
+
+/* ------------------------------------------------- labels vs the docs */
+
+const labelsDoc = JSON.parse(read('shared/labels.json'));
+const tagOf = new Map(labelsDoc.labels.map((l) => [l.label, l]));
+let tableRows = 0;
+for (const f of docFiles) {
+    for (const line of read(f).split(/\r?\n/)) {
+        const cells = line.split('|').map((c) => c.trim());
+        if (cells.length < 4 || !/^[0-3][0-7]{2}$/.test(cells[1])) continue;
+        const def = tagOf.get(cells[1]);
+        const tag = cells[2];
+        if (!/^[A-Z_]+$/.test(tag)) continue; // not a label table row
+        if (!def) fail(`${f}: label ${cells[1]} is not in shared/labels.json`);
+        else if (def.tag !== tag) fail(`${f}: label ${cells[1]} is ${def.tag}, doc says ${tag}`);
+        else if (cells[3] && def.unit !== cells[3]) fail(`${f}: ${tag} unit is ${def.unit}, doc says ${cells[3]}`);
+        if (f === 'ai/rules/integrator.md') tableRows++;
+    }
+}
+if (tableRows !== labelsDoc.labels.length) {
+    fail(`ai/rules/integrator.md: label table has ${tableRows} rows, labels.json has ${labelsDoc.labels.length}`);
+}
+
+/* --------------------------------------- facts restated from the code */
+
+const testCount = tracked
+    .concat(untracked)
+    .filter((f) => /^test\/.*\.test\.mjs$/.test(f))
+    .reduce((n, f) => n + (read(f).match(/^test\(/gm) ?? []).length, 0);
+
+const httpPort = grab('backend/serve.mjs', /'--http-port',\s*(\d+)/, 'HTTP port default');
+const a429Port = grab('backend/serve.mjs', /'--a429-port',\s*(\d+)/, 'A429 port default');
+const padPort = grab('host/pad-reader.ps1', /\[int\]\$Port\s*=\s*(\d+)/, 'pad port default');
+const facts = [
+    // [what, value from code, doc file, regex whose group 1 must equal it]
+    ['run-all HTTP port', grab('tools/run-all.mjs', /HTTP_PORT = (\d+)/, 'HTTP_PORT'), null, httpPort],
+    ['run-all A429 port', grab('tools/run-all.mjs', /A429_PORT = (\d+)/, 'A429_PORT'), null, a429Port],
+    ['run-all pad port', grab('tools/run-all.mjs', /PAD_PORT = (\d+)/, 'PAD_PORT'), null, padPort],
+    ['HTTP port', httpPort, 'ai/rules/common.md', /HTTP `(\d+)`/],
+    ['A429 port', a429Port, 'ai/rules/common.md', /A429 in `(\d+)`/],
+    ['pad port', padPort, 'ai/rules/common.md', /pad frames `(\d+)`/],
+    ['pad frame length', grab('firmware/src/pad.h', /PAD_FRAME_LEN (\d+)/, 'PAD_FRAME_LEN'), 'ai/rules/embedded.md', /= (\d+) bytes/],
+    ['stale window', grab('backend/src/state.js', /STALE_MS = (\d+)/, 'STALE_MS'), 'ai/rules/backend.md', /`STALE_MS` = (\d+)/],
+    ['SSE rate', grab('backend/src/server.js', /SSE_HZ = (\d+)/, 'SSE_HZ'), 'ai/rules/backend.md', /`state` at (\d+) Hz/],
+    ['firmware rate', grab('firmware/src/flight.h', /RATE_HZ (\d+)u/, 'RATE_HZ'), 'ai/rules/embedded.md', /`RATE_HZ` = (\d+)/],
+    ['deadzone', grab('firmware/src/pad.h', /PAD_DEADZONE ([\d.]+)f/, 'PAD_DEADZONE'), 'ai/rules/embedded.md', /`PAD_DEADZONE` = ([\d.]+)/],
+    ['test count', String(testCount), 'ai/rules/common.md', /`npm test` passes \*\*(\d+)\/\1\*\*/],
+    ['SSE rate (frontend)', grab('backend/src/server.js', /SSE_HZ = (\d+)/, 'SSE_HZ'), 'ai/rules/frontend.md', /`state` \((\d+) Hz\)/],
+    ['easing constant', grab('frontend/js/sfd.js', /SMOOTH_TAU_MS = (\d+)/, 'SMOOTH_TAU_MS'), 'ai/rules/frontend.md', /`SMOOTH_TAU_MS` = (\d+)/],
+    ...['ROLL_RATE_DPS', 'PITCH_RATE_DPS', 'CAS_RATE_KTS', 'VS_RATE_FPMS', 'ROLL_LIMIT_DEG', 'PITCH_LIMIT_DEG', 'CAS_MAX_KT', 'VS_LIMIT_FPM'].map(
+        (name) => [
+            name,
+            grab('firmware/src/flight.h', new RegExp(`#define ${name}\\s+([\\d.]+)f`), name),
+            'ai/rules/embedded.md',
+            new RegExp(`\`${name}\` = ([\\d.]+)`),
+        ],
+    ),
+];
+for (const [what, value, file, re] of facts) {
+    if (value === null) continue;
+    if (file === null) {
+        if (value !== re) fail(`${what} is ${value} but the backend default is ${re}`);
+        continue;
+    }
+    const doc = grab(file, re, what);
+    // numeric compare, so 30.0f in C equals 30 in prose
+    if (doc !== null && Number(doc) !== Number(value)) fail(`${file}: ${what} says ${doc}, code says ${value}`);
+}
+
+/* --------------------------------------------------- chain consistency */
+
+const chain = JSON.parse(read('ai/chain.json'));
+const ids = new Set();
+for (const s of chain.stages) {
+    if (ids.has(s.id)) fail(`ai/chain.json: duplicate stage ${s.id}`);
+    for (const d of s.dependsOn) if (!ids.has(d)) fail(`ai/chain.json: ${s.id} depends on ${d}, not an earlier stage`);
+    ids.add(s.id);
+    if (!ownership.agents[s.owner]) fail(`ai/chain.json: ${s.id} owner ${s.owner} is not an agent`);
+    if (!skills.has(s.skill)) fail(`ai/chain.json: ${s.id} skill ${s.skill} does not exist`);
+    for (const d of s.deliverables) {
+        const p = d.split(' ')[0];
+        if (!existsSync(join(ROOT, p))) fail(`ai/chain.json: ${s.id} deliverable ${p} does not exist`);
+    }
+}
+
+/* -------------------------------------------------------------- report */
+
+if (problems.length) {
+    for (const p of problems) console.log(`  ✗ ${p}`);
+    console.log(`[check-ai] FAIL: ${problems.length} problem(s)`);
+    process.exit(1);
+}
+console.log(
+    `[check-ai] ok: ${agents.size} agents, ${skills.size} skills, ${tracked.length + untracked.length} files owned, ` +
+        `${testCount} tests, ${labelsDoc.labels.length} labels`,
+);

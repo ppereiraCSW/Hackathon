@@ -16,6 +16,10 @@
     "test": "node --test test/*.test.mjs",
     "test:a429": "node --test test/a429.test.mjs",
     "test:state": "node --test test/state.test.mjs",
-    "test:e2e": "node --test test/e2e.test.mjs"
+    "test:e2e": "node --test test/e2e.test.mjs",
+    "chain": "node tools/chain.mjs",
+    "check:ai": "node tools/check-ai.mjs",
+    "check:ownership": "node tools/check-ownership.mjs",
+    "hooks:install": "git config core.hooksPath .githooks"
   }
 }

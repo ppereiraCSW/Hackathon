@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Avionics pipeline: gamepad to Secondary Flight Display</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .h1 { font-size: 26px; font-weight: 700; fill: #0f172a; }
+      .h2 { font-size: 17px; font-weight: 700; fill: #0f172a; }
+      .h3 { font-size: 14px; font-weight: 700; fill: #0f172a; }
+      .t  { font-size: 12.5px; fill: #334155; }
+      .s  { font-size: 11.5px; fill: #475569; }
+      .m  { font-size: 11.5px; fill: #0f172a; font-family: Consolas, "Cascadia Mono", monospace; }
+      .lbl { font-size: 11.5px; fill: #0f172a; font-weight: 600; }
+      .box { stroke-width: 1.5; rx: 10; }
+      .emb { fill: #fff7ed; stroke: #ea580c; }
+      .bck { fill: #eff6ff; stroke: #2563eb; }
+      .frt { fill: #f0fdf4; stroke: #16a34a; }
+      .shr { fill: #faf5ff; stroke: #9333ea; }
+      .neu { fill: #f8fafc; stroke: #64748b; }
+      .flow { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arr); }
+      .dash { stroke: #9333ea; stroke-width: 2; fill: none; stroke-dasharray: 6 5; marker-end: url(#arr); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="760" fill="#ffffff"/>
+
+  <text x="30" y="44" class="h1">Avionics pipeline: gamepad → ARINC 429 → Secondary Flight Display</text>
+  <text x="30" y="68" class="t">AERO HACKATHON: Humans X AI. Three layers, built the way certification-grade systems are: one source of truth per value, validity end to end, every claim measured.</text>
+
+  <!-- layer bands -->
+  <rect x="20" y="92" width="660" height="26" rx="6" fill="#ffedd5"/>
+  <text x="32" y="110" class="h3" style="fill:#9a3412">EMBEDDED  ·  firmware/  host/</text>
+  <rect x="690" y="92" width="230" height="26" rx="6" fill="#dbeafe"/>
+  <text x="702" y="110" class="h3">BACKEND  ·  backend/</text>
+  <rect x="930" y="92" width="250" height="26" rx="6" fill="#dcfce7"/>
+  <text x="942" y="110" class="h3">FRONTEND  ·  frontend/</text>
+
+  <!-- 1 gamepad -->
+  <rect x="20" y="132" width="150" height="150" class="box emb"/>
+  <text x="34" y="158" class="h2">USB gamepad</text>
+  <text x="34" y="180" class="s">DirectInput only</text>
+  <text x="34" y="197" class="m">VID_0079 PID_181C</text>
+  <text x="34" y="218" class="t">4 axes  X Y Z R</text>
+  <text x="34" y="236" class="t">buttons, D-pad</text>
+  <text x="34" y="262" class="s">no XInput support</text>
+
+  <!-- 2 pad reader -->
+  <rect x="200" y="132" width="200" height="150" class="box emb"/>
+  <text x="214" y="158" class="h2">Pad reader</text>
+  <text x="214" y="177" class="m">host/pad-reader.ps1</text>
+  <text x="214" y="200" class="t">HID input reports,</text>
+  <text x="214" y="217" class="t">WinMM as fallback</text>
+  <text x="214" y="238" class="t">50 Hz, 17-byte frames</text>
+  <text x="214" y="255" class="m">A5 5A seq XYZR btn pov xor</text>
+  <text x="214" y="273" class="s">PowerShell + .NET, no installs</text>
+
+  <!-- 3 firmware -->
+  <rect x="430" y="132" width="250" height="150" class="box emb"/>
+  <text x="444" y="158" class="h2">Firmware in QEMU</text>
+  <text x="444" y="177" class="m">mps2-an385 · Cortex-M3</text>
+  <text x="444" y="200" class="t">bare metal, polled SysTick, 50 Hz</text>
+  <text x="444" y="217" class="t">sticks = rate commands; heading</text>
+  <text x="444" y="234" class="t">and altitude integrated here</text>
+  <text x="444" y="255" class="t">BNR encode, SSM sign, odd parity</text>
+  <text x="444" y="273" class="s">UART1 in · UART0 out</text>
+
+  <!-- 4 backend -->
+  <rect x="710" y="132" width="210" height="150" class="box bck"/>
+  <text x="724" y="158" class="h2">Backend</text>
+  <text x="724" y="177" class="m">Node · zero dependencies</text>
+  <text x="724" y="200" class="t">decode → engineering units</text>
+  <text x="724" y="217" class="t">validity: NCD / TEST / parity</text>
+  <text x="724" y="234" class="t">stale after 250 ms</text>
+  <text x="724" y="255" class="t">no filtering, no derived values</text>
+  <text x="724" y="273" class="s">HTTP + SSE on 127.0.0.1:8090</text>
+
+  <!-- 5 browser -->
+  <rect x="950" y="132" width="230" height="150" class="box frt"/>
+  <text x="964" y="158" class="h2">Browser</text>
+  <text x="964" y="180" class="lbl">/sfd</text>
+  <text x="1000" y="180" class="t">Secondary Flight Display</text>
+  <text x="964" y="197" class="s">ADI, CAS / ALT / V/S tapes, heading</text>
+  <text x="964" y="220" class="lbl">/config</text>
+  <text x="1018" y="220" class="t">one slider set</text>
+  <text x="964" y="237" class="s">per label: display range, visible</text>
+  <text x="964" y="258" class="t">flags: STALE · NCD · INOP</text>
+  <text x="964" y="275" class="t">annunciator: A429 LOSS</text>
+
+  <!-- flow arrows -->
+  <path d="M170,207 L198,207" class="flow"/>
+  <path d="M400,207 L428,207" class="flow"/>
+  <path d="M680,207 L708,207" class="flow"/>
+  <path d="M920,207 L948,207" class="flow"/>
+  <text x="403" y="300" class="m">TCP :5556</text>
+  <text x="640" y="300" class="m">TCP :5555</text>
+  <text x="900" y="300" class="m">SSE 50 Hz</text>
+  <text x="150" y="300" class="s">HID</text>
+
+  <!-- A429 word -->
+  <text x="30" y="346" class="h2">The contract on the wire: one ARINC 429 word (32 bits, 4 bytes little-endian)</text>
+  <g transform="translate(30,360)">
+    <rect x="0" y="0" width="40" height="40" fill="#fee2e2" stroke="#b91c1c"/>
+    <text x="20" y="18" text-anchor="middle" class="lbl">P</text>
+    <text x="20" y="33" text-anchor="middle" class="s">32</text>
+    <rect x="40" y="0" width="80" height="40" fill="#fef3c7" stroke="#b45309"/>
+    <text x="80" y="18" text-anchor="middle" class="lbl">SSM</text>
+    <text x="80" y="33" text-anchor="middle" class="s">31–30</text>
+    <rect x="120" y="0" width="420" height="40" fill="#e0f2fe" stroke="#0369a1"/>
+    <text x="330" y="18" text-anchor="middle" class="lbl">DATA · 19-bit BNR magnitude</text>
+    <text x="330" y="33" text-anchor="middle" class="s">29–11</text>
+    <rect x="540" y="0" width="80" height="40" fill="#f1f5f9" stroke="#475569"/>
+    <text x="580" y="18" text-anchor="middle" class="lbl">SDI</text>
+    <text x="580" y="33" text-anchor="middle" class="s">10–9</text>
+    <rect x="620" y="0" width="200" height="40" fill="#ede9fe" stroke="#6d28d9"/>
+    <text x="720" y="18" text-anchor="middle" class="lbl">LABEL (octal, bit-reversed)</text>
+    <text x="720" y="33" text-anchor="middle" class="s">8–1</text>
+  </g>
+  <text x="30" y="422" class="t">Sign lives in the SSM (00 +, 11 −), never two's complement. 01 = No Computed Data, 10 = Functional Test. Odd parity over all 32 bits.</text>
+
+  <!-- labels table -->
+  <rect x="870" y="336" width="310" height="196" class="box shr"/>
+  <text x="884" y="360" class="h3">shared/labels.json · 6 labels</text>
+  <text x="884" y="382" class="m">324</text><text x="918" y="382" class="m">PITCH</text><text x="1008" y="382" class="m">deg</text><text x="1060" y="382" class="m">±180</text>
+  <text x="884" y="400" class="m">325</text><text x="918" y="400" class="m">ROLL</text><text x="1008" y="400" class="m">deg</text><text x="1060" y="400" class="m">±180</text>
+  <text x="884" y="418" class="m">314</text><text x="918" y="418" class="m">HEADING</text><text x="1008" y="418" class="m">deg</text><text x="1060" y="418" class="m">0..360</text>
+  <text x="884" y="436" class="m">204</text><text x="918" y="436" class="m">BARO_ALT</text><text x="1008" y="436" class="m">ft</text><text x="1060" y="436" class="m">−1000..100000</text>
+  <text x="884" y="454" class="m">206</text><text x="918" y="454" class="m">CAS</text><text x="1008" y="454" class="m">kt</text><text x="1060" y="454" class="m">0..600</text>
+  <text x="884" y="472" class="m">212</text><text x="918" y="472" class="m">VERT_SPEED</text><text x="1008" y="472" class="m">ft/min</text><text x="1060" y="472" class="m">±32000</text>
+  
+  
+  
+  
+  
+  
+  <text x="884" y="496" class="s">Read by the backend at start-up;</text>
+  <text x="884" y="512" class="s">mirrored in firmware/src/flight.h.</text>
+
+  <!-- decoupling + validity -->
+  <rect x="20" y="446" width="410" height="134" class="box shr"/>
+  <text x="34" y="470" class="h3">Decoupled by design, proven by a test</text>
+  <text x="34" y="492" class="t">The backend knows nothing about QEMU or the pad.</text>
+  <text x="34" y="510" class="t">With <tspan class="m">--replay</tspan> it plays <tspan class="m">shared/capture.a429</tspan>,</text>
+  <text x="34" y="528" class="t">a real recording, and opens no A429 port at all.</text>
+  <text x="34" y="552" class="m">node tools/run-all.mjs --replay</text>
+  <text x="34" y="570" class="s">test/e2e.test.mjs asserts both facts.</text>
+
+  <rect x="450" y="446" width="400" height="134" class="box neu"/>
+  <text x="464" y="470" class="h3">One validity path, end to end</text>
+  <text x="464" y="492" class="t">START on the pad → firmware sends every label as NCD</text>
+  <text x="464" y="510" class="t">→ backend marks it invalid → SFD flags NCD.</text>
+  <text x="464" y="528" class="t">Silence on the bus → stale after 250 ms → A429 LOSS.</text>
+  <text x="464" y="552" class="t">Sliders change the display window only, never a value.</text>
+  <text x="464" y="570" class="s">The embedded layer stays the only source of truth.</text>
+
+
+  <!-- footer: how to run / verify -->
+  <rect x="20" y="600" width="1160" height="140" rx="10" fill="#0f172a"/>
+  <text x="40" y="630" class="h3" style="fill:#f8fafc">Run it</text>
+  <text x="40" y="654" class="m" style="fill:#e2e8f0">node tools/run-all.mjs</text><text x="330" y="654" class="m" style="fill:#e2e8f0"># pad + QEMU + backend</text>
+  <text x="40" y="674" class="m" style="fill:#e2e8f0">node tools/run-all.mjs --no-pad</text><text x="330" y="674" class="m" style="fill:#e2e8f0"># no gamepad</text>
+  <text x="40" y="694" class="m" style="fill:#e2e8f0">node tools/run-all.mjs --replay</text><text x="330" y="694" class="m" style="fill:#e2e8f0"># backend only, from a recording</text>
+  <text x="40" y="720" class="m" style="fill:#94a3b8">open http://127.0.0.1:8090/sfd and /config</text>
+  <text x="620" y="630" class="h3" style="fill:#f8fafc">Prove it</text>
+  <text x="620" y="654" class="m" style="fill:#e2e8f0">npm test</text><text x="880" y="654" class="m" style="fill:#e2e8f0"># 38 tests</text>
+  <text x="620" y="674" class="m" style="fill:#e2e8f0">node tools/test-pad-path.mjs</text><text x="880" y="674" class="m" style="fill:#e2e8f0"># 16 checks through QEMU</text>
+  <text x="620" y="694" class="m" style="fill:#e2e8f0">node tools/probe-rate.mjs 5</text><text x="880" y="694" class="m" style="fill:#e2e8f0"># measured ~50 Hz</text>
+  <text x="620" y="720" class="m" style="fill:#e2e8f0">node tools/chain.mjs --all</text><text x="880" y="720" class="m" style="fill:#e2e8f0"># every milestone M0–M8</text>
+</svg>
