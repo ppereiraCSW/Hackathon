@@ -41,7 +41,7 @@
       "lsbNote": "4 ft/bit, the classic ARINC 429 baro-corrected altitude resolution",
       "min": -1000,
       "max": 100000,
-      "display": { "min": 0, "max": 30000, "visible": true }
+      "display": { "min": -1000, "max": 45000, "visible": true }
     },
     {
       "label": "206",

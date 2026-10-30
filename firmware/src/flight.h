@@ -22,6 +22,11 @@
  * altitude always agree: nose up climbs, nose down descends, faster climbs
  * faster at the same pitch.
  *
+ * On the ground (altitude 0 ft) the aircraft is on its wheels: roll is held
+ * at 0, the nose cannot go below the runway and only rotates up at ROTATE_KT,
+ * and brakes bring the airspeed to 0 unless the throttle is forward. Throttle
+ * forward past ROTATE_KT and pull back to take off again.
+ *
  * Buttons: A = wings level (roll and pitch to 0), B held 1 s = reset heading,
  * LB/RB = CAS -/+10 kt, D-pad up/down = altitude +/-500 ft per press,
  * START = freeze (all labels -> NCD).
@@ -63,8 +68,16 @@
  * below-sea-level airfields), but the model used that as its floor, so a dive
  * parked the aircraft at -1000 ft while still reporting a descent. */
 #define ALT_GROUND_FT   0.0f
-#define ALT_CEILING_FT  100000.0f
+/* Certified ceiling of a narrow-body airliner (B737-800 41,000 ft; A320
+ * 39,800 ft). The label's bus range goes to 100,000 ft, which no airliner
+ * reaches; the model used to climb all the way there. */
+#define ALT_CEILING_FT  41000.0f
 #define FPM_PER_KT      101.2686f /* 1 kt = 6076.12 ft/h = 101.27 ft/min */
+/* On the ground: the nose rotates up only at rotation speed (narrow-body Vr
+ * is ~130-150 kt), and wheel brakes slow the aircraft when the throttle is
+ * not forward (~6 kt/s is firm airliner braking). */
+#define ROTATE_KT       130.0f
+#define BRAKE_KTS       6.0f
 
 static inline float clampf(float v, float lo, float hi) {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -127,6 +140,19 @@ static inline void flight_step(flight_state_t *s, const pad_state_t *pad) {
         s->pitch_deg = clampf(s->pitch_deg + pad->pitch * PITCH_RATE_DPS * DT_S,
                               -PITCH_LIMIT_DEG, PITCH_LIMIT_DEG);
         s->cas_kt = clampf(s->cas_kt + pad->cas * CAS_RATE_KTS * DT_S, 0.0f, CAS_MAX_KT);
+
+        /* --- on the ground: on the wheels, not flying ---
+         * Before this, touching down only stopped the descent: the aircraft
+         * kept its airspeed and could still bank while sitting at 0 ft. */
+        if (s->baro_alt_ft <= ALT_GROUND_FT) {
+            s->roll_deg = 0.0f;                        /* no bank on the gear */
+            if (s->pitch_deg < 0.0f || s->cas_kt < ROTATE_KT) {
+                s->pitch_deg = 0.0f;                   /* nose wheel on the runway */
+            }
+            if (pad->cas <= 0.0f) {                    /* brakes, unless taking off */
+                s->cas_kt = clampf(s->cas_kt - BRAKE_KTS * DT_S, 0.0f, CAS_MAX_KT);
+            }
+        }
     }
 
     /* --- derived: heading, coordinated turn ---

@@ -5,12 +5,13 @@
  * Three levels, as on a flight deck:
  *   warning  repeating two-tone alarm while the condition holds (A429 LOSS)
  *   callout  spoken phrase, repeated every few seconds while it holds
- *            (BANK ANGLE, SINK RATE)
+ *            (TERRAIN, BANK ANGLE, SINK RATE)
  *   caution  single chime when a condition appears (a parameter going INOP /
  *            NCD / STALE, or a value leaving its display limits)
  *
  * Browsers only allow audio after a user gesture, so sound starts disabled
- * and is armed by the SOUND button (setEnabled from a click handler).
+ * and is armed by the first click or key press on the SFD (setEnabled from
+ * that handler). The SFD itself shows no sound control.
  */
 
 const WARNING_PERIOD_MS = 1500;

@@ -83,22 +83,24 @@ holds it where it is.
 | Heading | integrated in the firmware from bank (coordinated turn) |
 | V/S, altitude | derived in the firmware: V/S = CAS × sin(pitch), altitude integrates V/S — so nose up climbs |
 | Rudder / R | unused |
+| On the ground (0 ft) | wings held level, nose can't go below the runway, brakes slow CAS ~6 kt/s to 0; throttle forward past 130 kt (Vr) and pull back to take off |
 | A | wings level (roll and pitch to 0) |
 | B (hold 1 s) | reset heading to 0 |
 | LB / RB | CAS −10 / +10 kt |
-| D-pad up / down | altitude ±500 ft per press, between the ground (0 ft) and 100,000 ft |
+| D-pad up / down | altitude ±500 ft per press, between the ground (0 ft) and the 41,000 ft airliner ceiling |
 | **START** | freeze — every label sent as **NCD** (demonstrates validity) |
 
 ## Aural alerts
 
-Sound is on by default, but browsers block audio until the page gets a click or
-key press: the SOUND badge reads **CLICK PAGE TO ARM** until then, and a chime
-confirms it is armed. The badge then mutes / unmutes. Every sound has its text
-in the annunciator line, so the two always agree.
+Browsers block audio until the page gets a click or key press, so click
+anywhere on the SFD once; a chime confirms the alerts are armed. The SFD has no
+sound control on screen. Every sound has its text in the annunciator line, so
+the two always agree.
 
 | Level | Sound | When |
 |---|---|---|
 | Warning | repeating hi-lo alarm | A429 LOSS — no label fresh |
+| Callout | spoken "TERRAIN" | airborne below 1,000 ft (ground is 0 ft) and not climbing; silent on the ground |
 | Callout | spoken "BANK ANGLE" | \|roll\| > 35° |
 | Callout | spoken "SINK RATE" | V/S below −3000 ft/min |
 | Caution | single chime when it appears | a parameter goes INOP / NCD / STALE, or leaves its display limits (LIMIT) |

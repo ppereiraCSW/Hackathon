@@ -3,114 +3,175 @@
 <head>
 <meta charset="utf-8">
 <title>Secondary Flight Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- B612: the typeface Airbus designed for cockpit displays. Offline, the
+     monospace fallback is used and nothing else changes. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="/css/app.css">
 <link rel="stylesheet" href="/css/sfd.css">
 </head>
 <body class="sfd-page">
-<main class="sfd" role="application" aria-label="Secondary Flight Display">
+<main class="sfd" aria-label="Secondary Flight Display">
 
-  <!-- ============================================ attitude + heading cluster -->
-  <section class="instr adi-panel" id="adi-panel" aria-label="Attitude director indicator">
-    <svg id="adi" viewBox="0 0 320 320" role="img" aria-label="Attitude">
-      <defs>
-        <clipPath id="adi-clip"><circle cx="160" cy="160" r="150"/></clipPath>
-        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#2a7fd4"/>
-          <stop offset="100%" stop-color="#6fb6ea"/>
-        </linearGradient>
-        <linearGradient id="gnd" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#a9762f"/>
-          <stop offset="100%" stop-color="#6d4718"/>
-        </linearGradient>
-      </defs>
-      <circle cx="160" cy="160" r="150" fill="#0d141c"/>
-      <g id="adi-att" clip-path="url(#adi-clip)">
-        <!-- roll rotates the world and the sky pointer; pitch shifts the world -->
-        <g id="adi-roll">
-          <g id="adi-world">
-            <rect x="-200" y="-400" width="720" height="560" fill="url(#sky)"/>
-            <rect x="-200" y="160" width="720" height="560" fill="url(#gnd)"/>
-            <line x1="-200" y1="160" x2="520" y2="160" stroke="#fff" stroke-width="2"/>
-            <g id="ladder" stroke="#fff" stroke-width="1.6" fill="#fff"
-               font-family="ui-monospace, monospace" font-size="11"></g>
+  <!-- ============================================================ status -->
+  <header class="sfd-bar">
+    <div class="sfd-name"><b>SFD</b><span>SECONDARY FLIGHT DISPLAY</span></div>
+    <div class="annun" id="s-annun"><span id="a-list" class="annun-list">—</span></div>
+    <div class="sfd-stats">
+      <span id="s-bus" class="badge inop">NO DATA</span>
+      <span class="stat">LABELS <b id="s-labels">0/6</b></span>
+      <span class="stat">WORDS <b id="s-words">0</b></span>
+      <span class="stat">PARITY <b id="s-parity">0</b></span>
+      <a class="stat link" href="/config" target="_blank" rel="noopener">CONFIG</a>
+    </div>
+  </header>
+
+  <!-- ======================================================= instruments
+       One SVG, one coordinate frame (1000 x 720), laid out like an airliner
+       standby instrument (Airbus ISIS / Boeing ISFD): horizon across the whole
+       display, speed tape left, altitude tape right, heading scale along the
+       bottom. V/S is not on a real ISIS; it is required here (label 212), so
+       it is a Boeing-style needle scale at the right edge. -->
+  <svg id="sfd-svg" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid meet" role="img"
+       aria-label="Attitude, airspeed, altitude, vertical speed and heading">
+    <defs>
+      <clipPath id="clip-display"><rect x="10" y="10" width="980" height="700" rx="18"/></clipPath>
+      <clipPath id="clip-ladder"><circle cx="500" cy="340" r="150"/></clipPath>
+      <clipPath id="clip-cas"><rect x="70" y="120" width="110" height="440"/></clipPath>
+      <clipPath id="clip-alt"><rect x="790" y="120" width="120" height="440"/></clipPath>
+      <clipPath id="clip-hdg"><rect x="270" y="610" width="460" height="50"/></clipPath>
+      <clipPath id="clip-cas-drum"><rect x="140" y="304" width="32" height="72"/></clipPath>
+      <clipPath id="clip-alt-drum"><rect x="856" y="304" width="50" height="72"/></clipPath>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#173f6e"/>
+        <stop offset="1" stop-color="#4f97d4"/>
+      </linearGradient>
+      <linearGradient id="gnd" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#8a5a26"/>
+        <stop offset="1" stop-color="#3b250e"/>
+      </linearGradient>
+      <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="10" height="10" fill="#ffb000" fill-opacity="0.08"/>
+        <line x1="0" y1="0" x2="0" y2="10" stroke="#ffb000" stroke-opacity="0.5" stroke-width="3"/>
+      </pattern>
+    </defs>
+
+    <g clip-path="url(#clip-display)">
+      <rect x="10" y="10" width="980" height="700" fill="#0b1016"/>
+
+      <!-- ---------------------------------------------------- attitude -->
+      <g id="att">
+        <g id="att-picture">
+          <g id="adi-roll">
+            <g id="adi-world">
+              <rect x="-900" y="-1700" width="2800" height="2040" fill="url(#sky)"/>
+              <rect x="-900" y="340" width="2800" height="2000" fill="url(#gnd)"/>
+              <line x1="-900" y1="340" x2="1900" y2="340" stroke="#fff" stroke-width="2.5"/>
+            </g>
           </g>
-          <path id="roll-pointer" d="M160 26 L152 40 L168 40 Z" fill="#ffcc00"/>
+          <g clip-path="url(#clip-ladder)">
+            <g id="ladder-roll"><g id="ladder" stroke="#fff" stroke-width="2" fill="#fff"
+               font-size="13" class="mono"></g></g>
+          </g>
+          <g id="roll-scale" stroke="#fff" stroke-width="2.5" fill="none"></g>
+          <path d="M 491 142 L 509 142 L 500 155 Z" fill="#fff"/>
+          <g id="sky-pointer"><path d="M 500 158 L 491 172 L 509 172 Z" fill="#fff" stroke="#000" stroke-width="1"/></g>
+          <g fill="none" stroke-linecap="square">
+            <polyline points="370,340 445,340 445,355" stroke="#000" stroke-width="10"/>
+            <polyline points="630,340 555,340 555,355" stroke="#000" stroke-width="10"/>
+            <polyline points="370,340 445,340 445,355" stroke="#ffcc00" stroke-width="5"/>
+            <polyline points="630,340 555,340 555,355" stroke="#ffcc00" stroke-width="5"/>
+          </g>
+          <rect x="494" y="334" width="12" height="12" fill="#ffcc00" stroke="#000" stroke-width="2"/>
+        </g>
+        <g id="f-att" class="flag">
+          <rect x="440" y="314" width="120" height="50" rx="4"/>
+          <text x="500" y="349">ATT</text>
+          <text id="f-att-why" class="why" x="500" y="388">NCD</text>
         </g>
       </g>
-      <!-- fixed roll scale on the bezel, built from the ROLL display limits -->
-      <g id="roll-scale" stroke="#fff" stroke-width="2"></g>
-      <!-- fixed aircraft symbol -->
-      <g stroke="#ffcc00" stroke-width="4" fill="none" stroke-linecap="round">
-        <line x1="70" y1="160" x2="128" y2="160"/>
-        <line x1="192" y1="160" x2="250" y2="160"/>
-        <circle cx="160" cy="160" r="4" fill="#ffcc00"/>
+
+      <!-- ---------------------------------------------------- airspeed -->
+      <g id="ins-cas">
+        <rect x="70" y="120" width="110" height="440" rx="6" class="tape-bg"/>
+        <g clip-path="url(#clip-cas)"><g id="cas-ticks" class="tape-ticks"></g></g>
+        <g id="cas-box" class="readout">
+          <path d="M 74 318 L 140 318 L 140 304 L 172 304 L 172 330 L 188 340 L 172 350 L 172 376 L 140 376 L 140 362 L 74 362 Z"/>
+          <text id="cas-lead" x="143" y="352" text-anchor="end" font-size="30">—</text>
+          <g clip-path="url(#clip-cas-drum)"><g id="cas-drum" font-size="30" text-anchor="middle"></g></g>
+        </g>
+        <text x="125" y="108" class="cap">CAS <tspan class="unit">kt</tspan></text>
+        <g id="f-cas" class="flag">
+          <rect x="83" y="314" width="84" height="44" rx="4"/>
+          <text x="125" y="345">SPD</text>
+          <text id="f-cas-why" class="why" x="125" y="382">NCD</text>
+        </g>
       </g>
-      <circle cx="160" cy="160" r="150" fill="none" stroke="#2b3a49" stroke-width="3"/>
-    </svg>
 
-    <div class="adi-readouts">
-      <span id="r-pitch" class="readout">PITCH <b>—</b></span>
-      <span id="r-roll" class="readout">ROLL <b>—</b></span>
-    </div>
-    <div class="tape-flag" id="f-att">INOP</div>
-  </section>
+      <!-- ---------------------------------------------------- altitude -->
+      <g id="ins-alt">
+        <rect x="790" y="120" width="120" height="440" rx="6" class="tape-bg"/>
+        <g clip-path="url(#clip-alt)"><g id="alt-ticks" class="tape-ticks"></g></g>
+        <g id="alt-box" class="readout">
+          <path d="M 782 340 L 796 330 L 796 318 L 856 318 L 856 304 L 906 304 L 906 376 L 856 376 L 856 362 L 796 362 L 796 350 Z"/>
+          <text id="alt-lead" x="860" y="352" text-anchor="end" font-size="28">—</text>
+          <g clip-path="url(#clip-alt-drum)"><g id="alt-drum" font-size="22" text-anchor="middle"></g></g>
+        </g>
+        <text x="850" y="108" class="cap">ALT <tspan class="unit">ft</tspan></text>
+        <g id="f-alt" class="flag">
+          <rect x="808" y="314" width="84" height="44" rx="4"/>
+          <text x="850" y="345">ALT</text>
+          <text id="f-alt-why" class="why" x="850" y="382">NCD</text>
+        </g>
+      </g>
 
-  <!-- =============================================================== tapes -->
-  <section class="instr tape-col" aria-label="Speed and altitude tapes">
-    <div class="tape" id="tape-cas">
-      <div class="tape-title">CAS <span class="unit">kt</span></div>
-      <canvas id="cv-cas" width="120" height="380"></canvas>
-      <div class="tape-value"><b id="v-cas">—</b></div>
-      <div class="tape-flag" id="f-cas">INOP</div>
-    </div>
+      <!-- ------------------------------------------------ vertical speed -->
+      <g id="ins-vs">
+        <path d="M 920 170 L 966 190 L 966 490 L 920 510 Z" class="tape-bg"/>
+        <g id="vs-scale" stroke="#e8eef4" stroke-width="2"></g>
+        <g id="vs-needle"></g>
+        <text id="vs-value" x="944" y="160" class="vs-value"></text>
+        <text x="944" y="100" class="cap">V/S</text>
+        <text x="944" y="117" class="cap unit">ft/min</text>
+        <g id="f-vs" class="flag">
+          <rect x="920" y="318" width="48" height="40" rx="4"/>
+          <text x="944" y="345" font-size="16">V/S</text>
+          <text id="f-vs-why" class="why" x="944" y="380">NCD</text>
+        </g>
+      </g>
 
-    <div class="tape tape-vs" id="tape-vs">
-      <div class="tape-title">V/S <span class="unit">ft/min</span></div>
-      <canvas id="cv-vs" width="104" height="380"></canvas>
-      <div class="tape-value small"><b id="v-vs">—</b></div>
-      <div class="tape-flag" id="f-vs">INOP</div>
-    </div>
+      <!-- ------------------------------------------- pitch / roll readouts -->
+      <g id="ro-pitch" class="corner">
+        <rect x="70" y="612" width="110" height="52" rx="6" class="tape-bg"/>
+        <text x="125" y="632" class="cap">PITCH <tspan class="unit">deg</tspan></text>
+        <text id="r-pitch" x="125" y="656" class="corner-val">—</text>
+      </g>
+      <g id="ro-roll" class="corner">
+        <rect x="790" y="612" width="120" height="52" rx="6" class="tape-bg"/>
+        <text x="850" y="632" class="cap">ROLL <tspan class="unit">deg</tspan></text>
+        <text id="r-roll" x="850" y="656" class="corner-val">—</text>
+      </g>
 
-    <div class="tape" id="tape-alt">
-      <div class="tape-title">BARO ALT <span class="unit">ft</span></div>
-      <canvas id="cv-alt" width="132" height="380"></canvas>
-      <div class="tape-value"><b id="v-alt">—</b></div>
-      <div class="tape-flag" id="f-alt">INOP</div>
-    </div>
-  </section>
-
-  <!-- ============================================================= heading -->
-  <section class="instr hdg-panel" id="hdg-panel" aria-label="Heading">
-    <canvas id="cv-hdg" width="320" height="86"></canvas>
-    <div class="hdg-value"><b id="v-hdg">—</b><span class="unit">°</span></div>
-    <div class="tape-flag" id="f-hdg">INOP</div>
-  </section>
-
-  <!-- ============================================================== status -->
-  <section class="instr status-panel" aria-label="System status">
-    <div class="status-row">
-      <span class="tag">A429</span>
-      <span id="s-bus" class="badge inop">NO DATA</span>
-    </div>
-    <div class="status-row">
-      <span class="tag">words</span><span id="s-words" class="mono">0</span>
-    </div>
-    <div class="status-row">
-      <span class="tag">parity</span><span id="s-parity" class="mono">0</span>
-    </div>
-    <div class="status-row">
-      <span class="tag">labels</span><span id="s-labels" class="mono">0/6</span>
-    </div>
-    <div class="status-row">
-      <span class="tag">sound</span>
-      <button type="button" id="s-sound" class="badge sound" aria-label="Toggle aural alerts">OFF</button>
-    </div>
-    <div class="status-row annun" id="s-annun">
-      <span id="a-list" class="annun-list">—</span>
-    </div>
-    <p class="hint dim">Configured in the backend — <a href="/config" target="_blank" rel="noopener">sliders</a></p>
-  </section>
-
+      <!-- ----------------------------------------------------- heading -->
+      <g id="ins-hdg">
+        <rect x="270" y="610" width="460" height="50" rx="4" class="tape-bg"/>
+        <text x="272" y="600" class="cap" style="text-anchor: start">HDG <tspan class="unit">deg</tspan></text>
+        <g clip-path="url(#clip-hdg)"><g id="hdg-ticks" class="tape-ticks"></g></g>
+        <line x1="500" y1="606" x2="500" y2="634" stroke="#000" stroke-width="6"/>
+        <line x1="500" y1="606" x2="500" y2="634" stroke="#ffcc00" stroke-width="3"/>
+        <g class="readout">
+          <rect x="466" y="574" width="68" height="30" rx="3"/>
+          <text id="hdg-value" x="500" y="597" text-anchor="middle" font-size="22">—</text>
+        </g>
+        <g id="f-hdg" class="flag">
+          <rect x="458" y="614" width="84" height="40" rx="4"/>
+          <text x="500" y="643">HDG</text>
+          <text id="f-hdg-why" class="why" x="500" y="688">NCD</text>
+        </g>
+      </g>
+    </g>
+    <rect x="10" y="10" width="980" height="700" rx="18" fill="none" stroke="#1d2a37" stroke-width="2"/>
+  </svg>
 </main>
 
 <script type="module" src="/js/sfd.js"></script>

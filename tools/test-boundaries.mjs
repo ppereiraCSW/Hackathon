@@ -24,7 +24,7 @@ const LSB = Object.fromEntries(labels.map((d) => [d.tag, d.lsbPerBit]));
 
 /** Firmware model limits (firmware/src/flight.h). */
 const LIM = {
-    ROLL: 45, PITCH: 20, CAS_MAX: 250, VS: 6000, ALT_GROUND: 0, ALT_CEILING: 100000,
+    ROLL: 45, PITCH: 20, CAS_MAX: 250, VS: 6000, ALT_GROUND: 0, ALT_CEILING: 41000,
 };
 
 const POV_UP = 0;
@@ -99,19 +99,43 @@ async function main() {
         near('wings level -> V/S 0', v.VERT_SPEED, 0, 0);
 
         // ---------------------------------------------------------- ALTITUDE
-        console.log('BARO ALT  (limit ground 0 .. ceiling 100000 ft)');
+        console.log('BARO ALT  (limit ground 0 .. ceiling 41000 ft)');
         v = await fw.press({ pov: POV_DOWN }, 16);
         near('D-pad down to the ground stops at 0', v.BARO_ALT, LIM.ALT_GROUND, 0);
         s = await trace({ y: AXIS.MIN }, 3000);
         report('nose down on the ground: never below 0', min(s, 'BARO_ALT') >= LIM.ALT_GROUND, `min ${min(s, 'BARO_ALT')}`);
         report('nose down on the ground: V/S never < 0', min(s, 'VERT_SPEED') >= 0, `min ${min(s, 'VERT_SPEED')}`);
         near('held at the ground: V/S reads 0', last(s).VERT_SPEED, 0, 0);
-        s = await trace({ y: AXIS.MAX }, 5000);
-        report('nose up lifts off the ground', last(s).BARO_ALT > 0 && last(s).VERT_SPEED > 0,
+        report('on the ground: nose never below the runway', min(s, 'PITCH') >= 0, `min ${min(s, 'PITCH').toFixed(2)}`);
+
+        // On the wheels: no bank, brakes, nose up only at rotation speed.
+        console.log('ON THE GROUND  (no bank, brakes, rotate at 130 kt)');
+        s = await trace({ x: AXIS.MAX }, 1000);
+        report('full stick right: wings stay level', max(s, 'ROLL') === 0 && min(s, 'ROLL') === 0,
+            `roll ${min(s, 'ROLL')}..${max(s, 'ROLL')}`);
+        const cas0 = fw.values().CAS;
+        v = await fw.hold({}, 2000);
+        const braked = cas0 - v.CAS;
+        report('throttle centred: brakes ~6 kt/s', braked > 9 && braked < 15,
+            `${cas0.toFixed(1)} -> ${v.CAS.toFixed(1)} kt in 2 s`);
+        await fw.press({ buttons: BTN.LB }, 30);
+        s = await trace({}, 600);
+        near('brakes stop at 0 kt, never negative', last(s).CAS, 0, 0);
+        report('stopped: CAS never negative', min(s, 'CAS') >= 0, `min ${min(s, 'CAS')}`);
+        s = await trace({ y: AXIS.MAX }, 1500);
+        report('stick back below Vr: nose stays down', max(s, 'PITCH') === 0 && max(s, 'BARO_ALT') === 0,
+            `pitch max ${max(s, 'PITCH')}  alt max ${max(s, 'BARO_ALT')}`);
+        v = await fw.hold({ z: AXIS.MAX }, 6000);
+        report('takeoff roll: throttle forward past Vr', v.CAS >= 130 && v.BARO_ALT === 0,
+            `CAS ${v.CAS.toFixed(1)} kt, alt ${v.BARO_ALT}`);
+        s = await trace({ y: AXIS.MAX, z: AXIS.MAX }, 4000);
+        report('rotate past Vr: lifts off and climbs', last(s).BARO_ALT > 0 && last(s).VERT_SPEED > 0,
             `alt ${last(s).BARO_ALT}  V/S ${last(s).VERT_SPEED}`);
+        s = await trace({ x: AXIS.MAX }, 500);
+        report('airborne: can bank again', last(s).ROLL > 5, `roll ${last(s).ROLL.toFixed(1)}`);
         await level();
-        v = await fw.press({ pov: POV_UP }, 205);
-        near('D-pad up to the ceiling stops at 100000', v.BARO_ALT, LIM.ALT_CEILING, 0);
+        v = await fw.press({ pov: POV_UP }, 86);
+        near('D-pad up to the ceiling stops at 41000', v.BARO_ALT, LIM.ALT_CEILING, 0);
         s = await trace({ y: AXIS.MAX }, 3000);
         report('nose up at the ceiling: never above', max(s, 'BARO_ALT') <= LIM.ALT_CEILING, `max ${max(s, 'BARO_ALT')}`);
         near('held at the ceiling: V/S reads 0', last(s).VERT_SPEED, 0, 0);
