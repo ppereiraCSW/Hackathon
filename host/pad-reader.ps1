@@ -434,7 +434,7 @@ function Read-Pad {
                   Pov = $(if ($i.dwPOV -eq 4294967295 -or $i.dwPOV -eq 65535) { -1 } else { [int]$i.dwPOV }) }
     }
 
-    // --- HID: non-blocking poll for the newest input report
+    # --- HID: non-blocking poll for the newest input report
     $buf = [PadHid.Native]::PollReport($ctx.Device)
     if ($null -eq $buf) {
         # No new report this tick. HID is state-based, so repeating the last
@@ -495,8 +495,6 @@ Write-Host '[pad] waiting for the emulated guest to connect...' -ForegroundColor
 $client = $listener.AcceptTcpClient()
 $client.NoDelay = $true
 $stream = $client.GetStream()
-Write-Host '[pad] guest connected' -ForegroundColor Green
-
 $period = [int](1000.0 / $RateHz)
 $seq = 0
 $sent = 0
@@ -504,48 +502,65 @@ $last = @{ X = 32767; Y = 32767; Z = 32767; R = 32767; Buttons = 0; Pov = -1 }
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $deadline = if ($Seconds -gt 0) { $Seconds * 1000 } else { [long]::MaxValue }
 
-try {
-    while ($sw.ElapsedMilliseconds -lt $deadline) {
-        $t0 = $sw.ElapsedMilliseconds
+# If the guest (QEMU) goes away, do not die: drop the connection and wait for a
+# new one. A crashed guest should not force a restart of the whole stack, and a
+# half-open socket would otherwise throw on every write.
+while ($sw.ElapsedMilliseconds -lt $deadline) {
+    $client.NoDelay = $true
+    $stream = $client.GetStream()
+    Write-Host '[pad] guest connected' -ForegroundColor Green
 
-        $s = Read-Pad -ctx $ctx
-        if ($null -ne $s) {
-            if ($s.Ok) { $last = $s }
-            elseif ($s.Error) { Write-Warning "input read failed (code $($s.Error)) - sending neutral" }
+    try {
+        while ($sw.ElapsedMilliseconds -lt $deadline) {
+            $t0 = $sw.ElapsedMilliseconds
+
+            $s = Read-Pad -ctx $ctx
+            if ($null -ne $s) {
+                if ($s.Ok) { $last = $s }
+                elseif ($s.Error) { Write-Warning "input read failed (code $($s.Error)) - sending neutral" }
+            }
+
+            $seq16 = [uint16]($seq -band 0xFFFF)
+            $frame = [byte[]]::new(17)
+            $frame[0] = 0xA5; $frame[1] = 0x5A
+            [BitConverter]::GetBytes($seq16).CopyTo($frame, 2)
+            [BitConverter]::GetBytes([uint16]$last.X).CopyTo($frame, 4)
+            [BitConverter]::GetBytes([uint16]$last.Y).CopyTo($frame, 6)
+            [BitConverter]::GetBytes([uint16]$last.Z).CopyTo($frame, 8)
+            [BitConverter]::GetBytes([uint16]$last.R).CopyTo($frame, 10)
+            [BitConverter]::GetBytes([uint16]$last.Buttons).CopyTo($frame, 12)
+            [BitConverter]::GetBytes([int16]$last.Pov).CopyTo($frame, 14)
+            $x = [byte]0
+            for ($i = 0; $i -lt 16; $i++) { $x = $x -bxor $frame[$i] }
+            $frame[16] = $x
+
+            $stream.Write($frame, 0, $frame.Length)
+            $stream.Flush()
+            $sent++
+
+            if ($Echo -and ($sent % 10 -eq 0)) {
+                Write-Host ("seq={0,5} X={1,5} Y={2,5} Z={3,5} R={4,5} btn=0x{5:X4} pov={6}" -f `
+                    $seq16, $last.X, $last.Y, $last.Z, $last.R, $last.Buttons, $last.Pov)
+            }
+
+            $seq++
+            $sleep = $period - ($sw.ElapsedMilliseconds - $t0)
+            if ($sleep -gt 0) { Start-Sleep -Milliseconds $sleep }
         }
-
-        $seq16 = [uint16]($seq -band 0xFFFF)
-        $frame = [byte[]]::new(17)
-        $frame[0] = 0xA5; $frame[1] = 0x5A
-        [BitConverter]::GetBytes($seq16).CopyTo($frame, 2)
-        [BitConverter]::GetBytes([uint16]$last.X).CopyTo($frame, 4)
-        [BitConverter]::GetBytes([uint16]$last.Y).CopyTo($frame, 6)
-        [BitConverter]::GetBytes([uint16]$last.Z).CopyTo($frame, 8)
-        [BitConverter]::GetBytes([uint16]$last.R).CopyTo($frame, 10)
-        [BitConverter]::GetBytes([uint16]$last.Buttons).CopyTo($frame, 12)
-        [BitConverter]::GetBytes([int16]$last.Pov).CopyTo($frame, 14)
-        $x = [byte]0
-        for ($i = 0; $i -lt 16; $i++) { $x = $x -bxor $frame[$i] }
-        $frame[16] = $x
-
-        $stream.Write($frame, 0, $frame.Length)
-        $stream.Flush()
-        $sent++
-
-        if ($Echo -and ($sent % 10 -eq 0)) {
-            Write-Host ("seq={0,5} X={1,5} Y={2,5} Z={3,5} R={4,5} btn=0x{5:X4} pov={6}" -f `
-                $seq16, $last.X, $last.Y, $last.Z, $last.R, $last.Buttons, $last.Pov)
-        }
-
-        $seq++
-        $sleep = $period - ($sw.ElapsedMilliseconds - $t0)
-        if ($sleep -gt 0) { Start-Sleep -Milliseconds $sleep }
+    } catch [System.IO.IOException] {
+        Write-Host '[pad] guest disconnected; waiting for it to reconnect' -ForegroundColor Yellow
+    } catch [System.Net.Sockets.SocketException] {
+        Write-Host '[pad] guest socket closed; waiting for it to reconnect' -ForegroundColor Yellow
+    } finally {
+        try { $stream.Close() } catch {}
+        try { $client.Close() } catch {}
     }
+
+    if ($sw.ElapsedMilliseconds -ge $deadline) { break }
+    Write-Host '[pad] waiting for the emulated guest to connect...' -ForegroundColor DarkGray
+    $client = $listener.AcceptTcpClient()
 }
-finally {
-    Write-Host "[pad] stopping after $sent frames" -ForegroundColor Yellow
-    if ($ctx.Kind -eq 'hid') { [PadHid.Native]::Close($ctx.Device) }
-    try { $stream.Close() } catch {}
-    try { $client.Close() } catch {}
-    $listener.Stop()
-}
+
+Write-Host "[pad] stopping after $sent frames" -ForegroundColor Yellow
+if ($ctx.Kind -eq 'hid') { [PadHid.Native]::Close($ctx.Device) }
+$listener.Stop()

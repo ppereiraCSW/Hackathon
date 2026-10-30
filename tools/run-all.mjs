@@ -12,6 +12,7 @@
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
+import { connect } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { qemuPath, build, TOOLCHAIN_BIN } from '../firmware/build.mjs';
@@ -37,8 +38,15 @@ function log(tag, msg) {
 function launch(tag, cmd, argv, opts = {}) {
     const child = spawn(cmd, argv, { stdio: ['ignore', 'pipe', 'pipe'], ...opts });
     children.push({ tag, child });
-    child.stdout?.on('data', (d) => String(d).trimEnd().split('\n').forEach((l) => l && log(tag, l)));
-    child.stderr?.on('data', (d) => String(d).trimEnd().split('\n').forEach((l) => l && log(tag, l)));
+    const emit = (d) => {
+        for (const l of String(d).trimEnd().split('\n')) {
+            if (!l) continue;
+            log(tag, l);
+            opts.onLine?.(l);
+        }
+    };
+    child.stdout?.on('data', emit);
+    child.stderr?.on('data', emit);
     child.on('exit', (code) => {
         if (!shuttingDown) log(tag, `exited with code ${code}`);
     });
@@ -63,11 +71,37 @@ function shutdown(why = 'SIGINT') {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
+/**
+ * Wait for a component to announce readiness on its stdout.
+ *
+ * Do NOT probe the pad reader's port to see whether it is up: it calls
+ * AcceptTcpClient() exactly once, so a probe connection is mistaken for the
+ * guest, gets a frame, and then closes -- leaving the real guest (QEMU) locked
+ * out with "Failed to connect". Watching for the printed line is the only safe
+ * signal.
+ */
+function waitForAnnouncement(register, match, { timeoutMs = 40000, label = 'component' } = {}) {
+    return new Promise((res, rej) => {
+        const timer = setTimeout(
+            () => rej(new Error(`${label} did not announce readiness within ${timeoutMs} ms`)),
+            timeoutMs,
+        );
+        register.onAnnounce((line) => {
+            if (match.test(line)) {
+                clearTimeout(timer);
+                res();
+            }
+        });
+    });
+}
+
 /* ------------------------------------------------------------------- start */
 
 mkdirSync(join(ROOT, 'build'), { recursive: true });
 
 const mode = has('--replay') ? 'replay' : has('--no-pad') ? 'no-pad' : 'full';
+
+async function main() {
 log('sys', `mode: ${mode}`);
 
 // --- 1. backend (both modes need it; in replay it is the only data source)
@@ -75,17 +109,32 @@ const backendArgs = [join(ROOT, 'backend', 'serve.mjs')];
 if (mode === 'replay') {
     backendArgs.push('--replay', join(ROOT, 'shared', 'capture.a429'));
 }
-launch('backend', process.execPath, backendArgs);
+let backendReady = () => {};
+const backendAnnounced = new Promise((res) => { backendReady = res; });
+launch('backend', process.execPath, backendArgs, {
+    onLine: (line) => {
+        if (/awaiting A429 words|DECOUPLED replay/.test(line)) backendReady();
+    },
+});
 
 if (mode !== 'replay') {
     // --- 2. pad reader (listens; QEMU connects to it)
+    // It announces "listening on ..." only after it has compiled its C# interop
+    // and bound the socket, so that line is the readiness signal.
+    let padReady = () => {};
+    const padAnnounced = new Promise((res) => { padReady = res; });
     if (mode === 'full') {
         launch('pad', 'powershell.exe', [
             '-NoProfile', '-ExecutionPolicy', 'Bypass',
             '-File', join(ROOT, 'host', 'pad-reader.ps1'),
             '-Port', String(PAD_PORT),
-        ]);
+        ], {
+            onLine: (line) => {
+                if (/listening on 127\.0\.0\.1:/.test(line)) padReady();
+            },
+        });
     } else {
+        padReady();
         log('sys', 'no pad: the firmware will hold its default flight state');
     }
 
@@ -96,33 +145,54 @@ if (mode !== 'replay') {
         build({ entry: 'main', quiet: true });
     }
 
-    setTimeout(() => {
-        const argv = [
-            '-M', 'mps2-an385',
-            '-cpu', 'cortex-m3',
-            '-nographic',
-            '-monitor', 'none',
-            // UART0 TX -> backend (we are a TCP client)
-            '-chardev', `socket,id=u0,host=127.0.0.1,port=${A429_PORT},server=off`,
-            '-serial', 'chardev:u0',
-        ];
-        // UART1 only exists when a pad reader is listening. QEMU exits if a
-        // client chardev cannot connect, so attaching it unconditionally would
-        // make the whole stack die just because no gamepad is plugged in.
+    // The backend prints its "awaiting A429 words" line once it is bound.
+    const withTimeout = (p, ms, what) =>
+        Promise.race([
+            p,
+            new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} did not become ready within ${ms} ms`)), ms)),
+        ]);
+    try {
+        await withTimeout(backendAnnounced, 20000, 'backend');
         if (mode === 'full') {
-            argv.push(
-                // UART1 RX <- pad reader (we are also a client)
-                '-chardev', `socket,id=u1,host=127.0.0.1,port=${PAD_PORT},server=off`,
-                '-serial', 'chardev:u1',
-            );
+            await withTimeout(padAnnounced, 40000, 'pad reader (it compiles C# interop first, ~3 s)');
         }
-        argv.push('-kernel', elf);
-        launch('qemu', qemuPath(), argv);
-        log('sys', 'firmware booted in QEMU');
-    }, 1500);
+        log('sys', mode === 'full' ? 'backend and pad reader are both listening' : 'backend is listening');
+    } catch (err) {
+        log('sys', `cannot start QEMU: ${err.message}`);
+        log('sys', 'fix the failing component above, then run again');
+        shutdown('startup failure');
+        return;
+    }
+
+    const argv = [
+        '-M', 'mps2-an385',
+        '-cpu', 'cortex-m3',
+        '-nographic',
+        '-monitor', 'none',
+        // UART0 TX -> backend (we are a TCP client)
+        '-chardev', `socket,id=u0,host=127.0.0.1,port=${A429_PORT},server=off`,
+        '-serial', 'chardev:u0',
+    ];
+    // UART1 only exists when a pad reader is listening.
+    if (mode === 'full') {
+        argv.push(
+            // UART1 RX <- pad reader (we are also a client)
+            '-chardev', `socket,id=u1,host=127.0.0.1,port=${PAD_PORT},server=off`,
+            '-serial', 'chardev:u1',
+        );
+    }
+    argv.push('-kernel', elf);
+    launch('qemu', qemuPath(), argv);
+    log('sys', 'firmware booted in QEMU');
 }
 
 setTimeout(() => {
     log('sys', `configuration page: http://127.0.0.1:${HTTP_PORT}/config`);
     log('sys', `secondary flight display: http://127.0.0.1:${HTTP_PORT}/sfd`);
 }, 1200);
+}
+
+main().catch((err) => {
+    log('sys', `fatal: ${err.message}`);
+    shutdown('fatal error');
+});
