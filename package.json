@@ -13,6 +13,7 @@
     "start:keyboard": "node tools/start.mjs keyboard",
     "start:demo": "node tools/start.mjs demo",
     "start:replay": "node tools/start.mjs replay",
+    "stop": "node tools/start.mjs stop",
     "firmware": "node firmware/build.mjs --entry main",
     "vectors": "node tools/gen-vectors.mjs",
     "capture": "node tools/capture.mjs 6",

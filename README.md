@@ -16,6 +16,8 @@ certification-grade systems are put together. Organised by ASD · Skyline & Borg
 keyboard, scripted demo or recorded replay), suggests the gamepad when one is
 plugged in, waits until flight data flows, opens the flight display in the
 browser and prints the controls. Ctrl+C in that window stops everything.
+Closing the browser does not stop it; starting again closes the old session
+first, so the menu always shows. `npm run stop` stops it from anywhere.
 
 ```bash
 npm start                         # the same menu

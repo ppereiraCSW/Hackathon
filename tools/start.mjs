@@ -5,7 +5,11 @@
  *   start.cmd                       # double-click on Windows: shows the menu
  *   node tools/start.mjs            # same menu
  *   node tools/start.mjs keyboard   # skip the menu: gamepad | keyboard | demo | replay
+ *   node tools/start.mjs stop       # stop a running instance (also: npm run stop)
  *   node tools/start.mjs --no-browser
+ *
+ * If an old session is still running (closing the browser does not stop it),
+ * it is closed first, so the menu always shows.
  *
  * It checks the prerequisites, suggests the gamepad when one is plugged in,
  * runs tools/run-all.mjs in the chosen mode, waits until flight data really
@@ -26,7 +30,8 @@ const CONFIG = `http://127.0.0.1:${HTTP_PORT}/config`;
 
 const args = process.argv.slice(2);
 const noBrowser = args.includes('--no-browser');
-const asked = args.find((a) => !a.startsWith('--'));
+const stopOnly = args.includes('stop');
+const asked = stopOnly ? null : args.find((a) => !a.startsWith('--'));
 
 const c = {
     bold: (s) => `\x1b[1m${s}\x1b[0m`,
@@ -128,6 +133,110 @@ async function waitForData(timeoutMs) {
     return false;
 }
 
+/* ------------------------------------------------- an instance already up */
+
+/**
+ * The system already running on HTTP_PORT, if it is ours: walks up from the
+ * process listening on the port to the outermost start.mjs / run-all.mjs, so
+ * stopping it takes the whole tree (QEMU and the input reader included).
+ * @returns {Promise<{pid:number, mode:string, since:string}|null>}
+ */
+function findRunning() {
+    if (process.platform !== 'win32') return Promise.resolve(null);
+    const ps = `
+$l = Get-NetTCPConnection -LocalPort ${HTTP_PORT} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $l) { exit }
+$p = Get-CimInstance Win32_Process -Filter "ProcessId=$($l.OwningProcess)"
+$chain = @()
+while ($p) {
+    $chain += [pscustomobject]@{ Id = $p.ProcessId; Cmd = $p.CommandLine; Since = $p.CreationDate.ToString('HH:mm') }
+    $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($p.ParentProcessId)"
+}
+ConvertTo-Json -Compress -InputObject @($chain)`;
+    return new Promise((res) => {
+        execFile('powershell.exe', ['-NoProfile', '-Command', ps], { timeout: 15000 }, (err, out) => {
+            if (err || !String(out).trim()) return res(null);
+            let chain;
+            try {
+                chain = JSON.parse(out);
+            } catch {
+                return res(null);
+            }
+            const ours = chain.filter((p) => /serve\.mjs|run-all\.mjs|start\.mjs/.test(p.Cmd ?? ''));
+            if (ours.length === 0) return res(null);
+            const top = ours[ours.length - 1];
+            const runAll = ours.find((p) => /run-all\.mjs/.test(p.Cmd)) ?? null;
+            const flags = runAll?.Cmd ?? '';
+            const mode = !runAll
+                ? 'backend only'
+                : /--keyboard/.test(flags)
+                  ? 'Keyboard'
+                  : /--demo/.test(flags)
+                    ? 'Demo'
+                    : /--replay/.test(flags)
+                      ? 'Replay'
+                      : /--no-pad/.test(flags)
+                        ? 'No input'
+                        : 'Gamepad';
+            res({ pid: top.Id, mode, since: top.Since });
+        });
+    });
+}
+
+/** Stop a running instance and wait until its ports are free. */
+async function stopRunning(run) {
+    await new Promise((res) => execFile('taskkill', ['/PID', String(run.pid), '/T', '/F'], () => res()));
+    for (let i = 0; i < 40; i++) {
+        const busy = await Promise.all([HTTP_PORT, 5555, 5556].map(portBusy));
+        if (!busy.some(Boolean)) return true;
+        await new Promise((r) => setTimeout(r, 250));
+    }
+    return false;
+}
+
+/* ------------------------------------------------------------------ input */
+
+// One readline for every question, fed into a queue: rl.question() drops lines
+// that arrive before it is asked again (fast typing, pasted input).
+let rl = null;
+const pendingLines = [];
+let lineWaiter = null;
+
+function nextLine() {
+    if (!rl) {
+        rl = createInterface({ input: process.stdin, output: process.stdout });
+        rl.on('line', (l) => (lineWaiter ? (lineWaiter(l), (lineWaiter = null)) : pendingLines.push(l)));
+        rl.on('close', () => lineWaiter?.(null));
+        // Without a listener readline swallows Ctrl+C; quit as the user expects.
+        rl.on('SIGINT', () => process.exit(130));
+    }
+    if (pendingLines.length) return Promise.resolve(pendingLines.shift());
+    return new Promise((r) => (lineWaiter = r));
+}
+
+function closeInput() {
+    rl?.close();
+    rl = null;
+}
+
+/** Ask for a number 1..max; Enter picks `def`. `accept(n)` returns an error text or null. */
+async function askNumber(max, def, accept = () => null) {
+    for (;;) {
+        process.stdout.write(`\n  Choose 1-${max} [${def}]: `);
+        const line = await nextLine();
+        if (line === null) return null; // input closed
+        const a = line.trim();
+        const n = a === '' ? def : Number(a);
+        if (!Number.isInteger(n) || n < 1 || n > max) {
+            console.log(c.yellow('  Type a number from the list.'));
+            continue;
+        }
+        const err = accept(n);
+        if (!err) return n;
+        console.log(c.yellow(`  ${err}`));
+    }
+}
+
 /* ------------------------------------------------------------------ menu */
 
 async function chooseMode(available, suggested) {
@@ -139,34 +248,52 @@ async function chooseMode(available, suggested) {
         const line = `  ${i + 1}  ${m.title.padEnd(9)} ${m.what}${tag}`;
         console.log(available[k] ? line : c.dim(`${line}  - ${available.why[k]}`));
     });
-    const def = keys.indexOf(suggested) + 1;
-    // A line iterator, not rl.question(): question() drops lines that arrive
-    // before it is asked again (fast typing, pasted input).
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.setPrompt(`\n  Choose 1-${keys.length} [${def}]: `);
-    rl.prompt();
-    try {
-        for await (const line of rl) {
-            const a = line.trim();
-            const n = a === '' ? def : Number(a);
-            const k = keys[n - 1];
-            if (k && available[k]) return k;
-            console.log(c.yellow(k ? `  ${MODES[k].title} is not available here: ${available.why[k]}` : '  Type a number from the list.'));
-            rl.prompt();
-        }
-        return null; // input closed
-    } finally {
-        rl.close();
+    const n = await askNumber(keys.length, keys.indexOf(suggested) + 1, (i) =>
+        available[keys[i - 1]] ? null : `${MODES[keys[i - 1]].title} is not available here: ${available.why[keys[i - 1]]}`,
+    );
+    return n === null ? null : keys[n - 1];
+}
+
+/**
+ * Port 8090 is taken. If it is an old session of this system, close it;
+ * otherwise explain.
+ * @returns {Promise<'continue'|'done'>} continue = the port is free now
+ */
+async function handleRunning(wantedMode) {
+    const run = await findRunning();
+    if (!run) {
+        console.log(c.yellow(`\n  Port ${HTTP_PORT} is used by another program, so the system cannot start.`));
+        console.log(`  Close that program, or check what it is with: ${c.dim(`Get-NetTCPConnection -LocalPort ${HTTP_PORT}`)}\n`);
+        process.exitCode = 1;
+        return 'done';
     }
+
+    if (stopOnly) {
+        console.log(`  Stopping the running system (${run.mode}, started ${run.since})...`);
+        console.log((await stopRunning(run)) ? c.green('  Stopped.') : c.red('  Could not free the ports; close its window by hand.'));
+        return 'done';
+    }
+
+    // Closing the browser does not stop the system, so an old session is often
+    // still running in a forgotten window. Starting again means "start fresh":
+    // close the old one without asking, then show the menu as always.
+    process.stdout.write(c.dim(`  Closing the previous session (${run.mode}, started ${run.since})... `));
+    if (!(await stopRunning(run))) {
+        console.log(c.red('\n  Could not close it. Close its window by hand and try again.'));
+        process.exitCode = 1;
+        return 'done';
+    }
+    console.log(c.dim('done.'));
+    return 'continue';
 }
 
 /* ------------------------------------------------------------------ main */
 
 async function main() {
     if (await portBusy(HTTP_PORT)) {
-        console.log(c.yellow(`\n  Something is already running on port ${HTTP_PORT}, probably the system itself.`));
-        console.log(`  Open ${c.cyan(SFD)}, or stop the other window (Ctrl+C) and start again.\n`);
-        if (!noBrowser) openBrowser(SFD);
+        if ((await handleRunning(asked)) === 'done') return closeInput();
+    } else if (stopOnly) {
+        console.log('  Nothing is running.');
         return;
     }
 
@@ -205,8 +332,9 @@ async function main() {
             console.log(c.dim('    winget install --id SoftwareFreedomConservancy.QEMU --exact'));
         }
         mode = await chooseMode(available, suggested);
-        if (!mode) return;
+        if (!mode) return closeInput();
     }
+    closeInput();
 
     const hint = mode === 'replay' ? '' : c.dim('(the first start builds the firmware; give it a few seconds)');
     console.log(`\n  Starting ${c.bold(MODES[mode].title)}... ${hint}`);

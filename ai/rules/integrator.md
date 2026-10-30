@@ -73,7 +73,7 @@ Procedure:
 
 | Tool | Purpose |
 |---|---|
-| `start.mjs [mode]`, `start.cmd` | Friendly launcher: menu, prerequisite check, gamepad detection, waits for data, opens the SFD, prints controls. Wraps `run-all.mjs`. `npm start` |
+| `start.mjs [mode]`, `start.cmd` | Friendly launcher: menu, prerequisite check, gamepad detection, waits for data, opens the SFD, prints controls. Closes an old session still running on 8090 first, so the menu always shows; `stop` only stops it. Wraps `run-all.mjs`. `npm start`, `npm run stop` |
 | `run-all.mjs [--keyboard\|--demo\|--no-pad\|--replay]` | Start the input source, QEMU and backend in order; Ctrl+C tears down. Input: gamepad (default), keyboard, scripted demo, none, or replay (backend only) |
 | `test-pad-path.mjs` | 17 checks: synthetic pad frames → firmware → A429 → backend, incl. rate commands, hold on centre, D-pad step, NCD freeze, B long press |
 | `test-keyboard-path.mjs` | 10 checks: the real `host/keyboard-reader.ps1` (keys simulated with `-Hold`) → firmware → A429 → decode. Windows only |
