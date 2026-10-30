@@ -12,6 +12,8 @@
  *   X  (roll axis)   -> roll rate       up to 30 deg/s,  roll  -45 .. +45 deg
  *   Y  (pitch axis)  -> pitch rate      up to 10 deg/s,  pitch -20 .. +20 deg
  *   Z  (throttle)    -> CAS rate        up to 25 kt/s,   CAS     0 .. 250 kt
+ *                       airborne, pitch also trades CAS for height: nose up
+ *                       slows down, nose down speeds up (GRAVITY_KTS)
  *   derived          -> heading       integrated from roll as a coordinated turn
  *   derived          -> vertical speed  from pitch and airspeed (CAS * sin(pitch))
  *   derived          -> baro altitude integrated from vertical speed
@@ -78,6 +80,11 @@
  * not forward (~6 kt/s is firm airliner braking). */
 #define ROTATE_KT       130.0f
 #define BRAKE_KTS       6.0f
+/* Airborne, climbing trades airspeed for height and diving trades it back:
+ * gravity along the flight path, g * sin(pitch). g = 9.80665 m/s^2 = 19.06 kt/s,
+ * so +10 deg of pitch bleeds ~3.3 kt/s and +20 deg ~6.5 kt/s. Without it,
+ * pitching up climbed for ever at constant speed (changed 2026-10-30). */
+#define GRAVITY_KTS     19.0626f
 
 static inline float clampf(float v, float lo, float hi) {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -156,6 +163,12 @@ static inline void flight_step(flight_state_t *s, const pad_state_t *pad) {
             if (pad->cas <= 0.0f) {                    /* brakes, unless taking off */
                 s->cas_kt = clampf(s->cas_kt - BRAKE_KTS * DT_S, 0.0f, CAS_MAX_KT);
             }
+        } else {
+            /* Airborne: speed for height (see GRAVITY_KTS). The throttle above
+             * still adds or removes speed on top of it. */
+            float pr = s->pitch_deg * 3.14159265358979f / 180.0f;
+            float sin_pr = pr - (pr * pr * pr) / 6.0f;
+            s->cas_kt = clampf(s->cas_kt - GRAVITY_KTS * sin_pr * DT_S, 0.0f, CAS_MAX_KT);
         }
     }
 

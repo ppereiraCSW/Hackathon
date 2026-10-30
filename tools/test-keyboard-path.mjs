@@ -14,7 +14,7 @@
 import { spawn } from 'node:child_process';
 import { createServer as createTcpServer } from 'node:net';
 import { existsSync, readFileSync } from 'node:fs';
-import { qemuPath, build } from '../firmware/build.mjs';
+import { qemuPath, ensureBuilt } from '../firmware/build.mjs';
 import { ParamState } from '../backend/src/state.js';
 
 const KBD_PORT = 5576;
@@ -96,7 +96,7 @@ async function main() {
         console.log('[kbd-test] needs Windows (PowerShell + user32)');
         process.exit(2);
     }
-    if (!existsSync(ELF)) build({ entry: 'main', quiet: true });
+    ensureBuilt({ entry: 'main', quiet: true });
 
     // V/S follows pitch and airspeed in the firmware, so the pitch keys are
     // also the climb / descend keys.

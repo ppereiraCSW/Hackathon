@@ -104,7 +104,7 @@ Prize categories: **First to Fly** (first fully working solution), **Extra Mile*
 | Path | What it is |
 |------|------------|
 | `firmware/` | Bare-metal ARM Cortex-M3 firmware for QEMU `mps2-an385`: startup, linker script, CMSDK UART driver, pad frame parser, flight model, A429 encoder. Build with `node firmware/build.mjs`. |
-| `host/` | `pad-reader.ps1` (HID input reports, WinMM fallback → TCP frames), `keyboard-reader.ps1` (the same frames from the keyboard), `test-pad.ps1` and `test-hid.ps1` (diagnose the pad). PowerShell + .NET only, no npm packages. |
+| `host/` | `pad-reader.ps1` (XInput for Xbox-style pads, HID for the original pad, WinMM fallback → TCP frames), `keyboard-reader.ps1` (the same frames from the keyboard), `test-pad.ps1` and `test-hid.ps1` (diagnose the pad). PowerShell + .NET only, no npm packages. |
 | `backend/` | Node 24, zero dependencies. A429 decode, BNR→engineering units, per-label freshness watchdog, display-config store, HTTP + SSE. `node backend/serve.mjs`. |
 | `frontend/` | `sfd.html` (the Secondary Flight Display) and `config.html` (six sliders). Canvas + SVG, no frameworks. |
 | `shared/` | `labels.json` — the 6-label contract shared by firmware and backend; `a429-vectors.json` — golden vectors; `capture.a429` — a real recording used for the decoupled replay. |
@@ -244,9 +244,10 @@ user.email = paulo.pereira@criticalsoftware.com
 - There is no `main` branch on the remote yet; `sandbox` is currently the default.
 - The repo path may contain spaces, which break `-Wl,-Map=<path>`. The build
   script passes the path as a separate argument.
-- The gamepad is **DirectInput-only** (`HID\VID_0079&PID_181C`) and exposes **four**
-  axes; XInput cannot see it. Hence the HID reader (WinMM as fallback) and the derived
-  heading/altitude.
+- The original gamepad is **DirectInput-only** (`HID\VID_0079&PID_181C`) and exposes
+  **four** axes; XInput cannot see it. Hence the HID reader (WinMM as fallback) and the
+  derived heading/altitude. Xbox-style pads (e.g. 8BitDo) are read through XInput
+  instead, because over HID their axes read as fully deflected.
 - Nothing in this repo is sent anywhere without asking first.
 
 ## Open questions

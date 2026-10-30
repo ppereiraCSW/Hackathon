@@ -100,7 +100,7 @@
   <text x="684" y="291" class="h3">M2  Firmware</text>
   <text x="684" y="309" class="s">builds with no warnings,</text>
   <text x="684" y="323" class="s">sends the right words</text>
-  <text x="684" y="351" class="s" style="fill:#64748b">check: test-pad-path (21)</text>
+  <text x="684" y="351" class="s" style="fill:#64748b">check: test-pad-path (22)</text>
   <rect x="846" y="272" width="162" height="88" rx="8" class="emb" stroke-width="1.5"/>
   <text x="856" y="291" class="h3">M3  Real gamepad</text>
   <text x="856" y="309" class="s">sticks and buttons move</text>

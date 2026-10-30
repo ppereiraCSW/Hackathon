@@ -90,6 +90,7 @@ holds it where it is.
 | Throttle / Z | calibrated airspeed, up to 25 kt/s, 0–250 kt |
 | Heading | integrated in the firmware from bank (coordinated turn) |
 | V/S, altitude | derived in the firmware: V/S = CAS × sin(pitch), altitude integrates V/S — so nose up climbs |
+| Speed vs height | airborne, pitch trades airspeed for height: nose up slows down (about 6.5 kt/s at +20°), nose down speeds up; the throttle adds or removes speed on top |
 | Rudder / R | unused |
 | On the ground (0 ft) | wings held level, nose can't go below the runway, brakes slow CAS ~6 kt/s to 0; throttle forward past 130 kt (Vr) and pull back to take off |
 | A | wings level (roll and pitch to 0) |
@@ -97,6 +98,11 @@ holds it where it is.
 | LB / RB | CAS −10 / +10 kt |
 | D-pad up / down | altitude ±500 ft per press, between the ground (0 ft) and the 41,000 ft airliner ceiling |
 | **START** | freeze — every label sent as **NCD** (demonstrates validity) |
+
+**Xbox-style controller** (XInput, e.g. 8BitDo Ultimate 2): left stick = roll and
+pitch, **RT / LT = speed up / down** (the throttle axis), right stick unused, and
+A, B, LB, RB, START and the D-pad as above. The reader picks XInput automatically
+when such a controller is connected.
 
 ### Keyboard (`--keyboard`)
 
@@ -156,7 +162,7 @@ the two always agree.
 
 ```bash
 npm test                              # 64 tests, incl. boundary values per label
-node tools/test-pad-path.mjs          # 21 checks: pad frame -> firmware -> A429 -> backend
+node tools/test-pad-path.mjs          # 22 checks: pad frame -> firmware -> A429 -> backend
 node tools/test-boundaries.mjs        # 49 checks: every parameter into both limits, plus ground/takeoff, in QEMU
 node tools/test-keyboard-path.mjs     # the REAL keyboard reader through the firmware (Windows)
 node tools/verify-pad-live.mjs        # the REAL pad through the real pipeline

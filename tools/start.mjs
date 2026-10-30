@@ -97,9 +97,14 @@ function portBusy(port) {
 /** True when Windows lists a game controller. Best effort, never throws. */
 function gamepadPresent() {
     if (process.platform !== 'win32') return Promise.resolve(false);
+    // Match device IDs first: every XInput (Xbox-style) pad has "IG_" in its HID
+    // instance ID, and VID_0079&PID_181C is the original DirectInput pad. The
+    // friendly name is only a fallback because it is localised ("Controlador de
+    // jogos compatível com HID" on a Portuguese Windows).
     const ps =
-        "(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | " +
-        "Where-Object { $_.FriendlyName -like '*game controller*' -or $_.InstanceId -like 'HID\\VID_0079&PID_181C*' }).Count";
+        "@(Get-PnpDevice -PresentOnly -Class HIDClass -ErrorAction SilentlyContinue | " +
+        "Where-Object { $_.InstanceId -match '^HID\\\\.*IG_' -or $_.InstanceId -like 'HID\\VID_0079&PID_181C*' " +
+        "-or $_.FriendlyName -match 'game controller|controlador de jogos' }).Count";
     return new Promise((res) => {
         execFile('powershell.exe', ['-NoProfile', '-Command', ps], { timeout: 8000 }, (err, out) => {
             res(!err && Number(String(out).trim()) > 0);

@@ -70,6 +70,7 @@ Consequences, both decided with the operator:
 | R | — | unused: V/S as its own axis let attitude and altitude disagree |
 | *derived* | Heading | integrated from roll as a coordinated turn (turn rate ∝ tan(roll)) |
 | *derived* | Vertical speed | CAS × sin(pitch): nose up climbs; ±6000 ft/min |
+| *coupled* | Airspeed | throttle rate plus, airborne, −g·sin(pitch) (≈19.06 kt/s × sin): climbing bleeds speed, diving gains it (2026-10-30) |
 | *derived* | Baro altitude | integrated from vertical speed |
 | A | Wings level: roll and pitch to 0 | axes are rate commands, so this is the quick way back |
 | B (hold 1 s) | Reset heading to 0 | long press: a pad with turbo on B pulses it ~5 Hz |

@@ -17,7 +17,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { connect } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { qemuPath, build, TOOLCHAIN_BIN } from '../firmware/build.mjs';
+import { qemuPath, build, isStale, TOOLCHAIN_BIN } from '../firmware/build.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, '..');
@@ -172,9 +172,11 @@ if (mode !== 'replay') {
     }
 
     // --- 3. firmware: build, then boot in QEMU
+    // Rebuild whenever a source is newer than the binary, not only when it is
+    // missing: after a git pull an old ELF would fly the old flight model.
     const elf = join(ROOT, 'firmware', 'build', 'firmware-main.elf');
-    if (!existsSync(elf)) {
-        log('sys', 'building firmware...');
+    if (isStale({ entry: 'main' })) {
+        log('sys', existsSync(elf) ? 'firmware sources changed, rebuilding...' : 'building firmware...');
         build({ entry: 'main', quiet: true });
     }
 

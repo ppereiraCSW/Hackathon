@@ -3,7 +3,7 @@
 ## 1. The system in one picture
 
 ```
-USB gamepad --HID (WinMM fallback)--> host/pad-reader.ps1
+USB gamepad --XInput / HID (WinMM fallback)--> host/pad-reader.ps1
     --TCP :5556, 17-byte pad frames, 50 Hz--> QEMU mps2-an385 UART1 (RX)
         bare-metal Cortex-M3 firmware: 50 Hz flight model -> 6 A429 words
     QEMU UART0 (TX) --TCP :5555, 4 bytes LE per word--> backend (Node, zero deps)
@@ -71,7 +71,8 @@ Changing any of these is the user's decision. Propose it; do not do it.
 - Ports: HTTP `8090`, A429 in `5555`, pad frames `5556`. Tests use `18500+`.
 - The repo may sit under a path containing spaces. Pass paths as separate argv
   elements, never glued into one flag string.
-- The gamepad is `HID\VID_0079&PID_181C`, DirectInput only (XInput cannot see it),
+- Two gamepads are known: an 8BitDo Ultimate 2 (`VID_2DC8&PID_310B`, XInput) and
+  the original `HID\VID_0079&PID_181C`, DirectInput only (XInput cannot see it),
   four axes X Y Z R.
 
 ## 6. Evidence, not claims

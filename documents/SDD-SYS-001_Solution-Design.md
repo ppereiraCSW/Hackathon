@@ -315,7 +315,7 @@ first, then QEMU connects to both.
 | Attribute | How the architecture addresses it |
 |---|---|
 | Modifiability | Layers interact only through IF-2, IF-3, IF-4/5; any layer is replaceable behind its interface |
-| Testability | Unit tests per layer incl. boundary values for every label (`npm test`, 64), golden A429 vectors, firmware-in-QEMU harnesses (pad path 21 checks, both limits of every parameter plus ground and takeoff 49 checks, keyboard path 10 checks), end-to-end and decoupled replay tests; run chain M0–M9 and CI on every push |
+| Testability | Unit tests per layer incl. boundary values for every label (`npm test`, 64), golden A429 vectors, firmware-in-QEMU harnesses (pad path 22 checks, both limits of every parameter plus ground and takeoff 49 checks, keyboard path 10 checks), end-to-end and decoupled replay tests; run chain M0–M9 and CI on every push |
 | Safety / integrity (display) | Parity and label checks, per-label freshness watchdog, explicit invalid annunciation; no value synthesis downstream of the firmware |
 | Performance | 50 Hz end-to-end; < 1.5 kB/s on the bus; browser eases between frames |
 | Security | All sockets on loopback; static file serving confined to `frontend/`; config input validated |

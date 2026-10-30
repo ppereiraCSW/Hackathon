@@ -8,7 +8,7 @@
  * Usage: node firmware/build.mjs [--entry bringup|main]
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -59,6 +59,30 @@ const FLAGS = [
     '-ffunction-sections',
     '-fdata-sections',
 ];
+
+/**
+ * True when the ELF is missing or older than anything it is built from.
+ * "Exists" is not enough: after a git pull the old binary would keep running
+ * with the old flight model while the rest of the system is new.
+ */
+export function isStale({ entry = 'main', outDir = join(here, 'build') } = {}) {
+    const elf = join(outDir, `firmware-${entry}.elf`);
+    if (!existsSync(elf)) return true;
+    const built = statSync(elf).mtimeMs;
+    const srcDir = join(here, 'src');
+    const inputs = [
+        ...readdirSync(srcDir).map((f) => join(srcDir, f)),
+        join(here, 'mps2-an385.ld'),
+        join(here, 'build.mjs'),
+    ];
+    return inputs.some((f) => statSync(f).mtimeMs > built);
+}
+
+/** Build only when isStale(); returns the ELF path either way. */
+export function ensureBuilt({ entry = 'main', quiet = false } = {}) {
+    const elf = join(here, 'build', `firmware-${entry}.elf`);
+    return isStale({ entry }) ? build({ entry, quiet }) : elf;
+}
 
 export function build({ entry = 'main', outDir = join(here, 'build'), quiet = false } = {}) {
     const gcc = gccPath();

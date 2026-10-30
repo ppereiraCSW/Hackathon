@@ -20,6 +20,10 @@
 - The same sources must build on the Windows Arm GNU 14.2 release and on Ubuntu's
   `gcc-arm-none-eabi` in CI. Use only freestanding C11 (`_Static_assert` is fine).
 - Output: `firmware/build/firmware-<entry>.elf` and `.map`. Never commit `firmware/build/`.
+- Tools that boot the firmware call `isStale()` / `ensureBuilt()` from `build.mjs`:
+  rebuild when any source is newer than the ELF, not only when it is missing. An
+  old ELF after a `git pull` flies the old flight model against the new display
+  (seen 2026-10-30: pitch down while altitude climbed).
 - Flags (keep them): `-mcpu=cortex-m3 -mthumb -mfloat-abi=soft -O2 -g -Wall -Wextra
   -ffreestanding -fno-builtin -nostdlib -ffunction-sections -fdata-sections`,
   linked with `-Wl,--gc-sections -nostartfiles ... -lgcc`.
@@ -95,6 +99,11 @@ how fast a value changes, a centred stick holds it. All axes use
 
 - V/S used to be the R axis; pitching up then moved the ADI while altitude stayed
   put. Attitude, V/S and altitude must always agree: keep V/S derived.
+- Airborne, pitch trades airspeed for height: CAS changes by
+  −`GRAVITY_KTS` × sin(pitch) per second on top of the throttle (`GRAVITY_KTS` =
+  19.0626 kt/s, i.e. g). Nose up slows down, nose down speeds up. Without it the
+  aircraft climbed for ever at constant speed (user report, 2026-10-30). Not
+  applied on the ground.
 - Held at the ground or the ceiling, V/S reads 0, so V/S and altitude never
   disagree. The label's bus range (−1000..100000 ft) is wider than the model's.
 - **On the ground** (altitude at `ALT_GROUND_FT`) the aircraft is on its wheels:
@@ -141,7 +150,12 @@ how fast a value changes, a centred stick holds it. All axes use
 
 - PowerShell 5.1 + .NET only. No modules to install, no admin rights, no drivers.
 - `pad-reader.ps1` params: `-Port 5556`, `-RateHz 50`, `-Echo`, `-Seconds`,
-  `-Backend auto|hid|winmm`. HID first, WinMM fallback.
+  `-Backend auto|xinput|hid|winmm`. XInput first (Xbox-style pads: 8BitDo, Xbox ...),
+  then HID (the original DirectInput pad), then WinMM. Never read an XInput pad
+  over HID: its 16-bit axes read as full deflection with the 0..255 scaling the
+  HID path assumes (found 2026-10-30 with an 8BitDo Ultimate 2, `VID_2DC8&PID_310B`).
+  XInput map: left stick = X/Y (back = pitch up), RT − LT = Z, right stick Y = R,
+  A/B/LB/RB/START = the original button bits, D-pad = POV.
 - The reader **listens**; QEMU is the TCP client. It calls `AcceptTcpClient()`
   once. Never probe its port to check readiness: the probe takes the slot and QEMU
   is locked out. `tools/run-all.mjs` waits for its printed ready line instead.
@@ -174,7 +188,7 @@ how fast a value changes, a centred stick holds it. All axes use
 
 | Change | Must pass |
 |---|---|
-| Any firmware code | `node tools/chain.mjs --stage M2` (build with zero warnings, `test-pad-path` 21/21) |
+| Any firmware code | `node tools/chain.mjs --stage M2` (build with zero warnings, `test-pad-path` 22/22) |
 | Flight model limits | `node tools/test-boundaries.mjs` 49/49 (every parameter into both limits, ground, takeoff) |
 | Timing | `node tools/chain.mjs --stage M7` (`probe-rate` ≈ 50 Hz) |
 | Encoder | `npm run test:a429`, `node tools/test-pad-path.mjs` |

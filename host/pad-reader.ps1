@@ -4,13 +4,23 @@
     inside QEMU.
 
 .DESCRIPTION
-    Two backends, tried in order:
+    Three backends, tried in order:
 
-      1. HID   -- read the device's HID input reports directly. This is the
-                  primary path: it needs no Windows joystick registration, gives
-                  structured axis/button data, and keeps working when the WinMM
-                  joystick layer loses the device.
-      2. WinMM -- joyGetPosEx, the classic joystick API, used as a fallback.
+      1. XInput -- Xbox-style controllers (8BitDo, Xbox, most modern pads,
+                  VID_2DC8&PID_310B among them). Windows also exposes these over
+                  HID, but with 16-bit axes and a combined trigger axis that the
+                  HID path below misreads as full deflection, so XInput is the
+                  only correct way to read them.
+      2. HID    -- read the device's HID input reports directly. Used for the
+                  DirectInput-only pad (VID_0079&PID_181C) that XInput cannot
+                  see; it keeps working when the WinMM layer loses the device.
+      3. WinMM  -- joyGetPosEx, the classic joystick API, used as a fallback.
+
+    XInput mapping onto the frame (the firmware treats axes as rate commands):
+        left stick X   -> X  roll          left stick Y  -> Y  pitch (back = up)
+        RT minus LT    -> Z  speed         right stick Y -> R  (carried; unused by the model)
+        A, B, LB, RB, START -> the same button bits as the original pad
+        D-pad          -> POV (up 0, right 9000, down 18000, left 27000)
 
     Why HID first: on this machine the pad (VID_0079&PID_181C, "Gamepad") is a
     HID game-pad device (usage page 1, usage 5) that WinMM sometimes fails to see
@@ -41,7 +51,7 @@
     Stop after N seconds. 0 (default) runs until Ctrl+C.
 
 .PARAMETER Backend
-    auto (default) | hid | winmm. Forces a specific input path.
+    auto (default) | xinput | hid | winmm. Forces a specific input path.
 #>
 [CmdletBinding()]
 param(
@@ -49,7 +59,7 @@ param(
     [int]$RateHz = 50,
     [switch]$Echo,
     [int]$Seconds = 0,
-    [ValidateSet('auto', 'hid', 'winmm')]
+    [ValidateSet('auto', 'xinput', 'hid', 'winmm')]
     [string]$Backend = 'auto'
 )
 
@@ -389,7 +399,81 @@ public static int FindPad(out string name, out int axes, out int buttons) {
 '@
 }
 
+# ============================================================= XInput interop
+if (-not ('PadXInput.Native' -as [type])) {
+    Add-Type -Namespace PadXInput -Name Native -MemberDefinition @'
+[StructLayout(LayoutKind.Sequential)]
+public struct XINPUT_GAMEPAD {
+    public ushort wButtons; public byte bLeftTrigger; public byte bRightTrigger;
+    public short sThumbLX; public short sThumbLY; public short sThumbRX; public short sThumbRY;
+}
+[StructLayout(LayoutKind.Sequential)]
+public struct XINPUT_STATE { public uint dwPacketNumber; public XINPUT_GAMEPAD Gamepad; }
+[DllImport("xinput1_4.dll")] public static extern uint XInputGetState(uint index, out XINPUT_STATE state);
+'@
+}
+
 # ================================================================== backends
+
+function Start-XInputBackend {
+    for ($i = 0; $i -lt 4; $i++) {
+        $s = New-Object PadXInput.Native+XINPUT_STATE
+        if ([PadXInput.Native]::XInputGetState([uint32]$i, [ref]$s) -eq 0) {
+            Write-Host "[pad] backend: XInput  controller slot $i" -ForegroundColor Green
+            return @{ Kind = 'xinput'; Slot = [uint32]$i }
+        }
+    }
+    return $null
+}
+
+# XInput thumbstick (-32768..32767, up/right positive) -> 0..65535, 32767 centre.
+function From-Thumb([int]$v, [bool]$invert) {
+    if ($invert) { $v = -$v }
+    $u = $v + 32767
+    if ($u -lt 0) { $u = 0 }
+    if ($u -gt 65535) { $u = 65535 }
+    return $u
+}
+
+function Read-XInput {
+    param($ctx)
+    $s = New-Object PadXInput.Native+XINPUT_STATE
+    $r = [PadXInput.Native]::XInputGetState($ctx.Slot, [ref]$s)
+    if ($r -ne 0) {
+        return @{ Ok = $false; Error = $r; X = 32767; Y = 32767; Z = 32767; R = 32767; Buttons = 0; Pov = -1 }
+    }
+    $g = $s.Gamepad
+    $b = [int]$g.wButtons
+
+    # The frame keeps the original pad's button bits (firmware/src/pad.h).
+    $buttons = 0
+    if ($b -band 0x1000) { $buttons = $buttons -bor 0x0001 }  # A     -> wings level
+    if ($b -band 0x2000) { $buttons = $buttons -bor 0x0002 }  # B     -> heading reset (hold)
+    if ($b -band 0x0100) { $buttons = $buttons -bor 0x0004 }  # LB    -> CAS -10
+    if ($b -band 0x0200) { $buttons = $buttons -bor 0x0008 }  # RB    -> CAS +10
+    if ($b -band 0x0010) { $buttons = $buttons -bor 0x0010 }  # START -> freeze
+
+    $pov = -1
+    if ($b -band 0x0001) { $pov = 0 }
+    elseif ($b -band 0x0008) { $pov = 9000 }
+    elseif ($b -band 0x0002) { $pov = 18000 }
+    elseif ($b -band 0x0004) { $pov = 27000 }
+
+    # Speed from the triggers: right speeds up, left slows down, both = hold.
+    $trig = ([int]$g.bRightTrigger - [int]$g.bLeftTrigger) / 255.0
+    $z = [int][Math]::Round(32767 + $trig * 32767)
+
+    return @{
+        Ok      = $true
+        X       = (From-Thumb $g.sThumbLX $false)
+        # Pulling the stick back reads negative in XInput; back must be pitch up.
+        Y       = (From-Thumb $g.sThumbLY $true)
+        Z       = $z
+        R       = (From-Thumb $g.sThumbRY $false)
+        Buttons = $buttons
+        Pov     = $pov
+    }
+}
 function Find-HidGamepad {
     $devs = [PadHid.Native]::Enumerate()
     # Accept ONLY genuine game devices: 4 = Joystick, 5 = Game Pad, 8 = Multi-axis
@@ -452,6 +536,7 @@ function To-U16([double]$v, [double]$min, [double]$max) {
 
 function Read-Pad {
     param($ctx)
+    if ($ctx.Kind -eq 'xinput') { return Read-XInput -ctx $ctx }
     if ($ctx.Kind -eq 'winmm') {
         $i = $ctx.Info
         $r = [PadWinMM.Native]::joyGetPosEx($ctx.Id, [ref]$i)
@@ -506,13 +591,14 @@ function Read-Pad {
 
 # ================================================================ start up
 $ctx = $null
-if ($Backend -in @('auto', 'hid')) { $ctx = Start-HidBackend }
+if ($Backend -in @('auto', 'xinput')) { $ctx = Start-XInputBackend }
+if (-not $ctx -and $Backend -in @('auto', 'hid')) { $ctx = Start-HidBackend }
 if (-not $ctx -and $Backend -in @('auto', 'winmm')) {
     if ($Backend -eq 'auto') { Write-Host '[pad] HID unavailable, trying WinMM' -ForegroundColor Yellow }
     $ctx = Start-WinMMBackend
 }
 if (-not $ctx) {
-    throw "No gamepad found by either backend (HID or WinMM). Plug the USB gamepad in and retry. Run host/test-pad.ps1 for a full device report."
+    throw "No gamepad found by any backend (XInput, HID or WinMM). Plug the USB gamepad in and retry. Run host/test-pad.ps1 for a full device report."
 }
 $ctx.Echo = $Echo
 

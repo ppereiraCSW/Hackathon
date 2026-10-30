@@ -86,12 +86,15 @@ async function main() {
         v = await hold({ y: 0 }, 4500);
         results.push(expect('pitch full forward -> limit', v.PITCH, -20, 1));
 
-        // ---- throttle forward 1 s at 25 kt/s -> CAS rises by ~25 kt
+        // ---- throttle forward 1 s at 25 kt/s. The nose is 20 deg down here, and
+        // airborne the dive adds g*sin(20) ~ 6.5 kt/s (GRAVITY_KTS in flight.h),
+        // so CAS rises by ~31.5 kt.
+        const gainWant = 25 + 19.0626 * Math.sin((20 * Math.PI) / 180);
         const casBefore = values().CAS;
         v = await hold({ z: 65535 }, 1000);
         const casUp = v.CAS - casBefore;
-        const casOk = casUp > 15 && casUp < 35;
-        console.log(`  ${casOk ? 'PASS' : 'FAIL'}  CAS rate                   +${casUp.toFixed(1)} kt in 1 s  want ~25`);
+        const casOk = Math.abs(casUp - gainWant) < 10;
+        console.log(`  ${casOk ? 'PASS' : 'FAIL'}  CAS rate (throttle + dive) +${casUp.toFixed(1)} kt in 1 s  want ~${gainWant.toFixed(0)}`);
         results.push(casOk);
 
         // ---- V/S follows pitch and airspeed, altitude follows V/S
@@ -103,8 +106,18 @@ async function main() {
         const altOk = v.BARO_ALT < altBefore - 30;
         console.log(`  ${altOk ? 'PASS' : 'FAIL'}  nose down -> altitude falls ${altBefore.toFixed(0)} -> ${v.BARO_ALT.toFixed(0)} ft`);
         results.push(altOk);
+        const casBeforeClimb = v.CAS;
         v = await hold({ y: 65535 }, 4500);
         results.push(expect('nose up -> V/S = CAS*sin', v.VERT_SPEED, Math.round(vsWant(v)), 30));
+        // ---- climbing trades speed for height: over the pull-up the nose goes
+        // from -20 to +20 deg, so the net loss is small but must be a loss once
+        // the nose is up; hold 2 s more at +20 and it bleeds ~6.5 kt/s.
+        const casClimb = v.CAS;
+        v = await hold({ y: 65535 }, 2000);
+        const bleed = casClimb - v.CAS;
+        const bleedOk = bleed > 8 && bleed < 18;
+        console.log(`  ${bleedOk ? 'PASS' : 'FAIL'}  nose up bleeds speed       ${casClimb.toFixed(1)} -> ${v.CAS.toFixed(1)} kt in 2 s  want ~-13 (from ${casBeforeClimb.toFixed(0)})`);
+        results.push(bleedOk);
         const climbOk = v.VERT_SPEED > 1000;
         console.log(`  ${climbOk ? 'PASS' : 'FAIL'}  nose up climbs             V/S ${v.VERT_SPEED.toFixed(0)} ft/min`);
         results.push(climbOk);
