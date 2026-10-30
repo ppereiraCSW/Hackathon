@@ -1,10 +1,56 @@
 # Hackathon — Humans X AI
 
-Work repo for the **AERO HACKATHON: Humans X AI** — a one-day hackathon to build a
-simplified avionics system end to end. Organised by ASD · Skyline & Borg.
+An end-to-end simplified avionics system: a **USB gamepad** drives **bare-metal ARM
+firmware inside QEMU**, which transmits **bit-exact ARINC 429 words** to a decoupled
+**backend** that decodes them and feeds a live **Secondary Flight Display**.
+
+Built for the **AERO HACKATHON: Humans X AI** — one day, three layers, the way
+certification-grade systems are put together. Organised by ASD · Skyline & Borg.
 
 > Branch policy: **all work goes on `sandbox` first.** Nothing is merged to `main`
-> without an explicit decision to do so.
+> without an explicit decision to do so. No `main` exists yet.
+
+## Quick start
+
+```bash
+node tools/run-all.mjs            # gamepad + QEMU firmware + backend
+node tools/run-all.mjs --no-pad   # no gamepad attached
+node tools/run-all.mjs --replay   # decoupled: backend only, from a recording
+npm test                          # 38 tests
+```
+
+Then open **http://127.0.0.1:8090/config** (the sliders) and
+**http://127.0.0.1:8090/sfd** (the display). Requires Node 24, QEMU and the Arm GNU
+toolchain — see [Prerequisites](#prerequisites).
+
+## What it does
+
+```
+USB gamepad ──DirectInput──► host/pad-reader.ps1 ──TCP──► QEMU guest
+                                                          │  bare-metal Cortex-M3
+                                                          │  6 parameters @ 50 Hz
+                                                          ▼  ARINC 429 words
+                                              backend (Node, zero deps)
+                                              decode · units · validity
+                                                    │            │
+                                          SSE values│            │SSE config
+                                                    ▼            ▼
+                                              /sfd          /config
+                                         the display     6 sliders
+```
+
+| Parameter | A429 label (octal) | Unit | Driven by |
+|---|---|---|---|
+| Pitch | 324 | deg | left stick Y |
+| Roll | 325 | deg | left stick X |
+| Heading | 314 | deg | integrated from bank |
+| Baro altitude | 204 | ft | integrated from vertical speed |
+| Calibrated airspeed | 206 | kt | throttle / Z |
+| Vertical speed | 212 | ft/min | rudder / R |
+
+The six sliders on `/config` configure **how** each parameter is displayed (the range
+mapped onto the instrument and whether it is shown). They never override the value —
+the embedded layer stays the only source of truth.
 
 ---
 
@@ -35,11 +81,50 @@ Prize categories: **First to Fly** (first fully working solution), **Extra Mile*
 
 ## Repository contents
 
+### The system
+
+| Path | What it is |
+|------|------------|
+| `firmware/` | Bare-metal ARM Cortex-M3 firmware for QEMU `mps2-an385`: startup, linker script, CMSDK UART driver, pad frame parser, flight model, A429 encoder. Build with `node firmware/build.mjs`. |
+| `host/` | `pad-reader.ps1` (WinMM → TCP frames) and `test-pad.ps1` (diagnose the pad). PowerShell + .NET only, no npm packages. |
+| `backend/` | Node 24, zero dependencies. A429 decode, BNR→engineering units, per-label freshness watchdog, display-config store, HTTP + SSE. `node backend/serve.mjs`. |
+| `frontend/` | `sfd.html` (the Secondary Flight Display) and `config.html` (six sliders). Canvas + SVG, no frameworks. |
+| `shared/` | `labels.json` — the 6-label contract shared by firmware and backend; `a429-vectors.json` — golden vectors; `capture.a429` — a real recording used for the decoupled replay. |
+| `tools/` | `run-all.mjs` (orchestration), `verify-pad-live.mjs` (real pad end-to-end), `test-pad-path.mjs` (synthetic), `probe-rate.mjs`, `capture.mjs`, `gen-vectors.mjs`, `decode-capture.mjs`, `demo-inject.mjs`. |
+| `test/` | 38 tests: codec, state/watchdog/config, and end-to-end including the decoupled replay. |
+
+### The brief
+
 | Path | What it is |
 |------|------------|
 | `Hackathon_Humans_X_AI 1.pptx` | The kickoff / briefing deck (8 slides, 1.2 MB). Binary — ask for an extracted-text summary instead of a diff. |
-| `BRIEF.md` | Condensed written brief derived from the deck: the ask, the three layers, the day's timetable, prizes, setup steps, and the open questions the deck leaves unanswered. |
+| `BRIEF.md` | Condensed written brief derived from the deck: the ask, the three layers, the day's timetable, prizes, setup steps. |
+| `docs/PLAN.md` | The agreed plan: requirements, decisions, milestones, risks. |
+| `docs/ARCHITECTURE.md` | Data flow, wire contracts, why each boundary is where it is, and the limits. |
+| `docs/DEMO.md` | How to run it and a four-minute demo script. |
 | `README.md` | This file. |
+
+## Prerequisites
+
+Measured on the development machine, not assumed:
+
+```
+$ node --version                 v24.21.0
+$ qemu-system-arm --version      QEMU emulator version 11.1.0
+$ arm-none-eabi-gcc --version    (Arm GNU Toolchain 14.2.Rel1) 14.2.1 20241119
+```
+
+QEMU and the toolchain were installed with winget:
+
+```powershell
+winget install --id SoftwareFreedomConservancy.QEMU --exact
+winget install --id Arm.GnuArmEmbeddedToolchain --exact
+```
+
+Neither is on `PATH`; `firmware/build.mjs` uses absolute paths
+(`C:\Program Files\qemu\` and
+`C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\14.2 rel1\bin\`).
+Edit `TOOLCHAIN_BIN` / `QEMU_BIN` there if yours differ.
 
 ## The day
 
@@ -69,6 +154,30 @@ Do this before building:
 
 Further reading: *pi cockpit* — João Pedro Simões, Confluence.
 
+## Verification
+
+Every claim below is a command you can run.
+
+```bash
+npm test                             # 38/38 passing
+node tools/test-pad-path.mjs         # 12/12: pad frame -> firmware -> A429 -> backend
+node tools/verify-pad-live.mjs       # the REAL gamepad through the real pipeline
+node tools/probe-rate.mjs 5          # ~49.8 Hz measured against a 50 Hz target
+node tools/gen-vectors.mjs           # golden vectors, each derived twice and asserted equal
+node tools/decode-capture.mjs shared/capture.a429   # decode a recording offline
+```
+
+What the tests establish:
+
+- **The A429 words are real** — bit-reversed labels, BNR magnitudes, SSM sign
+  handling, odd parity. Corrupted words are rejected and the stream resynchronises;
+  the parity counter is visible on the SFD.
+- **The firmware really is ARM** — a bare-metal Cortex-M3 image with its own vector
+  table and linker script, running in QEMU. Not a script labelled "firmware".
+- **The decoupling is tested, not claimed** — `--replay` runs the entire display path
+  with no QEMU, no gamepad and no serial port, and a test asserts the A429 port is
+  not even opened in that mode.
+
 ## Working in this repo
 
 ```bash
@@ -90,22 +199,29 @@ user.email = paulo.pereira@criticalsoftware.com
 
 - `.pptx` is a binary: it does not diff. Keep the deck as reference material; put
   anything that changes in Markdown or code.
-- **Do not commit generated output** — extracts, builds, logs, `node_modules/`,
-  virtual environments. Add a `.gitignore` before the first code lands.
+- **Do not commit generated output** — `firmware/build/`, logs, `node_modules/`.
+  `.gitignore` covers these. Exception: `shared/capture.a429` is committed on
+  purpose — it is the fixture the decoupled replay test runs against.
 - There is no `main` branch on the remote yet; `sandbox` is currently the default.
+- The repo path contains a space (`CRITICAL SOFTWARE, S.A`), which breaks
+  `-Wl,-Map=<path>`. The build script passes it as a separate argument.
+- The gamepad is **DirectInput-only** (`HID\VID_0079&PID_181C`) and exposes **four**
+  axes; XInput cannot see it. Hence the WinMM reader and the derived heading/altitude.
 - Nothing in this repo is sent anywhere without asking first.
 
 ## Open questions
 
-The deck does not define these — resolve with a moderator / table lead:
+Settled during the build (see `docs/PLAN.md` for the decisions):
+
+- ~~**Sensor source**~~ — invented and documented: the gamepad, read on the host.
+- ~~**Tech stack**~~ — Node 24, C for the firmware, no frameworks, no npm packages.
+- ~~**Interfaces**~~ — ARINC 429 words over a QEMU UART; A429 owns the contract.
+- ~~**Acceptance criteria**~~ — six parameters, engineering units, 50 Hz, NCD/stale
+  handling demonstrated on the display.
+
+Still open — needs a moderator / table lead, not code:
 
 - **Submission** — "submit repo" only: which target, branch or tag?
-- **Acceptance criteria** — which flight data (attitude, altitude, airspeed, heading?),
-  what units, what update rate, what failure behaviour. "Simplified" is undefined.
-- **Sensor source** — is simulated hardware provided, or invented by the team?
-- **Tech stack** — no language or framework is mandated; the embedded layer is
-  described only as a "tiny-RTOS".
-- **Interfaces** — protocol, message format, and who owns the contract between layers.
 - **"The Hive"** — what counts as an automated pipeline for integrating changes.
 - **Team size** — not stated ("find your table").
 

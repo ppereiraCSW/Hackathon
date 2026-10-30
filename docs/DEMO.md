@@ -30,7 +30,6 @@ node tools/run-all.mjs --replay   # DECOUPLED: backend only, from the recording
 ```
 
 Then open both pages (two windows side by side is the best demo):
-
 - **configuration** — http://127.0.0.1:8090/config
 - **SFD** — http://127.0.0.1:8090/sfd
 
@@ -44,6 +43,32 @@ node tools/demo-inject.mjs 60
 
 Standing in for `pad-reader.ps1`, it injects a scripted bank-and-climb so the SFD
 visibly moves. Useful for a screen recording or if the pad is not recognised.
+
+### Verifying the physical gamepad (one-time setup check)
+
+```bash
+node tools/verify-pad-live.mjs
+```
+
+This runs the **real** `pad-reader.ps1`, the **real** firmware in QEMU and the
+**real** backend, then shows one live table comparing what Windows reports for each
+axis with what the backend decoded from ARINC 429:
+
+```
+  Windows axis (0..65535, centre 32767)          decoded from ARINC 429
+  ──────────────────────────────────────────────────────────────────────
+  X  roll             ●···················         -27.2 deg
+  Y  pitch            ·········●··········           3.8 deg
+  Z  CAS              ··················●·          96.0 kt
+  R  V/S              ··········●·········        -478.0 fpm
+```
+
+Move each stick and press START; the footer names every input it saw move. This is
+the only way to confirm the button bit ordering and axis assignment on *this* pad,
+because synthetic frames cannot test the physical device. If an axis drives the
+wrong parameter, change the mapping in `firmware/src/flight.h` (`flight_step`).
+
+It exits with code 2 and instructions if no pad is plugged in.
 
 ## Controls
 
@@ -87,6 +112,7 @@ visibly moves. Useful for a screen recording or if the pad is not recognised.
 ```bash
 npm test                              # 38 tests
 node tools/test-pad-path.mjs          # 12 checks: pad frame -> firmware -> A429 -> backend
+node tools/verify-pad-live.mjs        # the REAL pad through the real pipeline
 node tools/probe-rate.mjs 5           # measured frame rate, expect ~50 Hz
 node tools/gen-vectors.mjs            # regenerates the golden vectors (must not change)
 node tools/decode-capture.mjs shared/capture.a429   # decode a recording offline
