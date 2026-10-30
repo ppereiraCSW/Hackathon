@@ -22,17 +22,15 @@ function padFrame({ seq, x, y, z, r, buttons = 0, pov = -1 }) {
   return b;
 }
 
-// A gentle banking turn while climbing: right bank, slight back stick, rising.
-const script = (t) => {
-  const s = Math.sin(t * 0.6);
-  const c = Math.cos(t * 0.4);
-  return {
-    x: Math.round(32767 + s * 22000),        // roll
-    y: Math.round(32767 + 8000 * Math.sin(t * 0.35)), // pitch
-    z: Math.round(32767 + c * 18000),        // CAS
-    r: Math.round(32767 + 14000 * Math.sin(t * 0.5)), // VS
-  };
-};
+// The firmware treats the axes as rate commands, so these are stick rates: each
+// is a cosine, which integrates to a value swinging either side of where it
+// started (roll about +/-30 deg, pitch +/-5 deg, CAS +/-30 kt, V/S +/-1300 fpm).
+const script = (t) => ({
+  x: Math.round(32767 + 22000 * Math.cos(t * 0.6)),  // roll
+  y: Math.round(32767 + 8000 * Math.cos(t * 0.35)),  // pitch
+  z: Math.round(32767 + 18000 * Math.cos(t * 0.4)),  // CAS
+  r: Math.round(32767 + 22000 * Math.cos(t * 0.5)),  // VS
+});
 
 const srv = createServer((sock) => {
   console.log('[demo] firmware connected, injecting pad frames');

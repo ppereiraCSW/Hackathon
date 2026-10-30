@@ -4,15 +4,21 @@
  * The 6 parameters and how the pad drives them (decided 2026-10-30, because the
  * pad exposes only 4 axes):
  *
- *   X  (roll axis)   -> roll          -45 .. +45 deg
- *   Y  (pitch axis)  -> pitch         -20 .. +20 deg
- *   Z  (throttle)    -> CAS             0 .. 250 kt
- *   R  (rudder)      -> vertical speed -2000 .. +2000 ft/min
+ * The axes are RATE commands: stick deflection sets how fast a value changes,
+ * and centring the stick holds it (decided 2026-10-30; the first version mapped
+ * stick position straight to value, so everything snapped back on release and
+ * heading only wobbled around 0/359).
+ *
+ *   X  (roll axis)   -> roll rate       up to 30 deg/s,  roll  -45 .. +45 deg
+ *   Y  (pitch axis)  -> pitch rate      up to 10 deg/s,  pitch -20 .. +20 deg
+ *   Z  (throttle)    -> CAS rate        up to 25 kt/s,   CAS     0 .. 250 kt
+ *   R  (rudder)      -> V/S rate        up to 1000 fpm/s, V/S -2000 .. +2000 ft/min
  *   derived          -> heading       integrated from roll as a coordinated turn
  *   derived          -> baro altitude integrated from vertical speed
  *
- * Buttons: A = reset pitch/roll trim, B = reset heading, LB/RB = CAS -/+10 kt,
- * D-pad up/down = altitude +/-500 ft, START = freeze (all labels -> NCD).
+ * Buttons: A = wings level (roll and pitch to 0), B held 1 s = reset heading,
+ * LB/RB = CAS -/+10 kt, D-pad up/down = altitude +/-500 ft,
+ * START = freeze (all labels -> NCD).
  */
 #ifndef FLIGHT_H
 #define FLIGHT_H
@@ -39,6 +45,20 @@
 #define RATE_HZ 50u
 #define DT_S    (1.0f / (float)RATE_HZ)
 
+/* Full-deflection rates and the limits each value is held within. */
+#define ROLL_RATE_DPS   30.0f
+#define PITCH_RATE_DPS  10.0f
+#define CAS_RATE_KTS    25.0f
+#define VS_RATE_FPMS    1000.0f
+#define ROLL_LIMIT_DEG  45.0f
+#define PITCH_LIMIT_DEG 20.0f
+#define CAS_MAX_KT      250.0f
+#define VS_LIMIT_FPM    2000.0f
+
+static inline float clampf(float v, float lo, float hi) {
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 typedef struct {
     float pitch_deg;
     float roll_deg;
@@ -46,8 +66,7 @@ typedef struct {
     float baro_alt_ft;
     float cas_kt;
     float vert_speed_fpm;
-    float pitch_trim_deg; /* stick-trim offset */
-    float roll_trim_deg;
+    uint16_t hdg_reset_ticks; /* consecutive ticks B has been held */
     uint8_t freeze;       /* 1 = report NCD on every label */
     uint32_t tick;
     uint32_t prev_buttons;
@@ -60,8 +79,7 @@ static inline void flight_init(flight_state_t *s) {
     s->baro_alt_ft = 5000.0f; /* start airborne, on a demo-friendly altitude */
     s->cas_kt = 120.0f;
     s->vert_speed_fpm = 0.0f;
-    s->pitch_trim_deg = 0.0f;
-    s->roll_trim_deg = 0.0f;
+    s->hdg_reset_ticks = 0;
     s->freeze = 0;
     s->tick = 0;
     s->prev_buttons = 0;
@@ -74,8 +92,12 @@ static inline float wrap_360(float d) {
 }
 
 /* One 50 Hz step: consume pad state, integrate derived values, apply buttons. */
-#define BTN_A_RESET_TRIM 0x0001u
+#define BTN_A_LEVEL      0x0001u
 #define BTN_B_RESET_HDG  0x0002u
+/* Heading reset is destructive, so it needs a deliberate 1 s hold. On the demo
+ * pad B was found firing by itself at ~5 Hz (turbo/auto-fire), and with an
+ * edge trigger every pulse zeroed the heading, pinning the SFD at 000. */
+#define HDG_RESET_HOLD_TICKS RATE_HZ
 #define BTN_LB_CAS_DOWN  0x0004u
 #define BTN_RB_CAS_UP    0x0008u
 #define BTN_START_FREEZE 0x0010u
@@ -85,12 +107,15 @@ static inline float wrap_360(float d) {
 static inline void flight_step(flight_state_t *s, const pad_state_t *pad) {
     s->tick++;
 
-    /* --- direct axes --- */
+    /* --- rate-commanded axes: deflection = rate, centred stick = hold --- */
     if (!s->freeze) {
-        s->roll_deg = pad->roll * 45.0f + s->roll_trim_deg;
-        s->pitch_deg = pad->pitch * 20.0f + s->pitch_trim_deg;
-        s->cas_kt = pad->cas * 250.0f;
-        s->vert_speed_fpm = pad->vs * 2000.0f;
+        s->roll_deg = clampf(s->roll_deg + pad->roll * ROLL_RATE_DPS * DT_S,
+                             -ROLL_LIMIT_DEG, ROLL_LIMIT_DEG);
+        s->pitch_deg = clampf(s->pitch_deg + pad->pitch * PITCH_RATE_DPS * DT_S,
+                              -PITCH_LIMIT_DEG, PITCH_LIMIT_DEG);
+        s->cas_kt = clampf(s->cas_kt + pad->cas * CAS_RATE_KTS * DT_S, 0.0f, CAS_MAX_KT);
+        s->vert_speed_fpm = clampf(s->vert_speed_fpm + pad->vs * VS_RATE_FPMS * DT_S,
+                                   -VS_LIMIT_FPM, VS_LIMIT_FPM);
     }
 
 
@@ -116,12 +141,17 @@ static inline void flight_step(flight_state_t *s, const pad_state_t *pad) {
     uint16_t pressed = (uint16_t)(pad->buttons & ~prev);
     s->prev_buttons = pad->buttons;
 
-    if (pressed & BTN_A_RESET_TRIM) {
-        s->pitch_trim_deg = 0.0f;
-        s->roll_trim_deg = 0.0f;
+    if (pressed & BTN_A_LEVEL) {
+        s->pitch_deg = 0.0f;
+        s->roll_deg = 0.0f;
     }
-    if (pressed & BTN_B_RESET_HDG) {
-        s->heading_deg = 0.0f;
+    if (pad->buttons & BTN_B_RESET_HDG) {
+        /* Fire once when the hold reaches 1 s, not again until released. */
+        if (s->hdg_reset_ticks < HDG_RESET_HOLD_TICKS) {
+            if (++s->hdg_reset_ticks == HDG_RESET_HOLD_TICKS) s->heading_deg = 0.0f;
+        }
+    } else {
+        s->hdg_reset_ticks = 0;
     }
     if (pressed & BTN_LB_CAS_DOWN) {
         s->cas_kt -= 10.0f;

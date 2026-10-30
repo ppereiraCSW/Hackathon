@@ -20,10 +20,11 @@
 #define PAD_DEADZONE 0.06f
 
 typedef struct {
-    float roll;      /* -1..+1  from X */
-    float pitch;     /* -1..+1  from Y (stick back / pulled = +) */
-    float cas;       /*  0..+1  from Z */
-    float vs;        /* -1..+1  from R */
+    /* All axes are -1..+1 rate commands, 0 at centre (see flight.h). */
+    float roll;      /* from X */
+    float pitch;     /* from Y (stick back / pulled = +) */
+    float cas;       /* from Z */
+    float vs;        /* from R */
     uint16_t buttons;
     int16_t pov;     /* degrees * 100, or -1 for centred */
     uint16_t seq;
@@ -66,7 +67,7 @@ static inline int pad_apply_frame(pad_state_t *st, const uint8_t *f, int len) {
     st->seq = rd_u16(f + 2);
     st->roll = pad_axis_norm(rd_u16(f + 4));
     st->pitch = pad_axis_norm(rd_u16(f + 6));
-    st->cas = (float)rd_u16(f + 8) / 65535.0f;
+    st->cas = pad_axis_norm(rd_u16(f + 8));
     st->vs = pad_axis_norm(rd_u16(f + 10));
     st->buttons = rd_u16(f + 12);
     st->pov = (int16_t)rd_u16(f + 14);

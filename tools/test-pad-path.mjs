@@ -98,62 +98,84 @@ async function main() {
             return ok;
         };
 
+        /** Hold one stick state for `ms`, sending frames at the reader's 50 Hz. */
+        const hold = async (opts, ms) => {
+            for (let t = 0; t < ms; t += 20) { send(opts); await sleep(20); }
+            await sleep(120);
+            return values();
+        };
+
         let failures = 0;
         const results = [];
 
-        // ---- neutral
-        for (let i = 0; i < 20; i++) { send({}); await sleep(20); }
-        await sleep(150);
-        let v = values();
+        // The axes are rate commands (firmware/src/flight.h): deflection moves
+        // the value, a centred stick holds it.
+
+        // ---- neutral: the model's defaults, unchanged
+        let v = await hold({}, 400);
         results.push(expect('neutral roll', v.ROLL, 0, 0.5));
         results.push(expect('neutral pitch', v.PITCH, 0, 0.5));
-        results.push(expect('neutral CAS', v.CAS, 125, 2)); // Z centre -> 125 kt
+        results.push(expect('neutral CAS', v.CAS, 120, 1));
 
-        // ---- full right roll: X max -> +45 deg
-        for (let i = 0; i < 20; i++) { send({ x: 65535 }); await sleep(20); }
-        await sleep(120);
-        v = values();
-        results.push(expect('roll full right', v.ROLL, 45, 1));
+        // ---- full right roll for 2 s at 30 deg/s -> saturates at +45
+        v = await hold({ x: 65535 }, 2000);
+        results.push(expect('roll full right -> limit', v.ROLL, 45, 1));
 
-        // ---- full left roll
-        for (let i = 0; i < 20; i++) { send({ x: 0 }); await sleep(20); }
-        await sleep(120);
-        v = values();
-        results.push(expect('roll full left', v.ROLL, -45, 1));
-
-        // ---- stick back: Y max -> +20 deg pitch
-        for (let i = 0; i < 20; i++) { send({ y: 65535 }); await sleep(20); }
-        await sleep(120);
-        v = values();
-        results.push(expect('pitch full back', v.PITCH, 20, 1));
-
-        // ---- stick forward: Y min -> -20 deg
-        for (let i = 0; i < 20; i++) { send({ y: 0 }); await sleep(20); }
-        await sleep(120);
-        v = values();
-        results.push(expect('pitch full forward', v.PITCH, -20, 1));
-
-        // ---- throttle full: Z max -> 250 kt
-        for (let i = 0; i < 20; i++) { send({ z: 65535 }); await sleep(20); }
-        await sleep(120);
-        v = values();
-        results.push(expect('CAS full throttle', v.CAS, 250, 2));
-
-        // ---- vertical speed full up: R max -> +2000 fpm
-        for (let i = 0; i < 20; i++) { send({ r: 65535 }); await sleep(20); }
-        await sleep(120);
-        v = values();
-        results.push(expect('VS full up', v.VERT_SPEED, 2000, 40));
-
-        // ---- heading integrates from roll: hold right bank and watch it climb
-        const hdgBefore = values().HEADING;
-        for (let i = 0; i < 60; i++) { send({ x: 65535 }); await sleep(20); }
-        await sleep(120);
-        const hdgAfter = values().HEADING;
-        const turned = ((hdgAfter - hdgBefore) + 360) % 360;
-        const hdgOk = turned > 1 && turned < 180;
-        console.log(`  ${hdgOk ? 'PASS' : 'FAIL'}  heading integrates right    ${hdgBefore.toFixed(1)} -> ${hdgAfter.toFixed(1)} (+${turned.toFixed(1)} deg)`);
+        // ---- centre the stick: roll HOLDS, and the held bank keeps turning
+        const hdgBefore = v.HEADING;
+        v = await hold({}, 1000);
+        results.push(expect('roll holds when centred', v.ROLL, 45, 1));
+        const turned = ((v.HEADING - hdgBefore) + 360) % 360;
+        const hdgOk = turned > 2 && turned < 180;
+        console.log(`  ${hdgOk ? 'PASS' : 'FAIL'}  held bank keeps turning    ${hdgBefore.toFixed(1)} -> ${v.HEADING.toFixed(1)} (+${turned.toFixed(1)} deg)`);
         results.push(hdgOk);
+
+        // ---- B pulsing at 5 Hz (a pad with turbo on) must NOT reset heading
+        const hdgTurbo = values().HEADING;
+        for (let i = 0; i < 5; i++) {
+            await hold({ buttons: 0x0002 }, 100);
+            await hold({}, 100);
+        }
+        const hdgAfterTurbo = values().HEADING;
+        const turboOk = hdgAfterTurbo > hdgTurbo + 1;
+        console.log(`  ${turboOk ? 'PASS' : 'FAIL'}  B pulses ignored           ${hdgTurbo.toFixed(1)} -> ${hdgAfterTurbo.toFixed(1)} (still turning)`);
+        results.push(turboOk);
+
+        // ---- B held for 1 s resets heading (the 45 deg bank keeps turning at
+        // ~5 deg/s afterwards, so allow for the time since the reset)
+        v = await hold({ buttons: 0x0002 }, 1100);
+        const resetOk = v.HEADING < 4;
+        console.log(`  ${resetOk ? 'PASS' : 'FAIL'}  B held 1 s resets heading  got ${v.HEADING.toFixed(2)}  want 0..4`);
+        results.push(resetOk);
+
+        // ---- half a second of left stick takes off ~15 deg, not all of it
+        v = await hold({ x: 0 }, 500);
+        const partial = v.ROLL > 20 && v.ROLL < 40;
+        console.log(`  ${partial ? 'PASS' : 'FAIL'}  roll is incremental        got ${v.ROLL.toFixed(2)}  want 20..40`);
+        results.push(partial);
+
+        // ---- A levels the wings
+        await hold({ buttons: 0x0001 }, 80);
+        v = await hold({}, 200);
+        results.push(expect('A -> wings level (roll)', v.ROLL, 0, 0.5));
+
+        // ---- stick back for 2.5 s at 10 deg/s -> +20; forward 4.5 s -> -20
+        v = await hold({ y: 65535 }, 2500);
+        results.push(expect('pitch full back -> limit', v.PITCH, 20, 1));
+        v = await hold({ y: 0 }, 4500);
+        results.push(expect('pitch full forward -> limit', v.PITCH, -20, 1));
+
+        // ---- throttle forward 1 s at 25 kt/s -> CAS rises by ~25 kt
+        const casBefore = values().CAS;
+        v = await hold({ z: 65535 }, 1000);
+        const casUp = v.CAS - casBefore;
+        const casOk = casUp > 15 && casUp < 35;
+        console.log(`  ${casOk ? 'PASS' : 'FAIL'}  CAS rate                   +${casUp.toFixed(1)} kt in 1 s  want ~25`);
+        results.push(casOk);
+
+        // ---- vertical speed up 2.5 s at 1000 fpm/s -> +2000
+        v = await hold({ r: 65535 }, 2500);
+        results.push(expect('VS full up -> limit', v.VERT_SPEED, 2000, 40));
 
         // ---- START button toggles NCD on every label
         for (let i = 0; i < 4; i++) { send({ buttons: 0x0010 }); await sleep(20); }

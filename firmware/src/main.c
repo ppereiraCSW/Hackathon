@@ -70,7 +70,7 @@ int main(void) {
     static pad_state_t pad;
     pad.roll = 0.0f;
     pad.pitch = 0.0f;
-    pad.cas = 120.0f / 250.0f;
+    pad.cas = 0.0f;
     pad.vs = 0.0f;
     pad.buttons = 0;
     pad.pov = -1;
@@ -117,12 +117,7 @@ int main(void) {
         if (tick_accum < ticks_per_frame) continue;
         tick_accum -= ticks_per_frame;
 
-        if (!pad.got_frame) {
-            /* No pad at all: keep the SFD alive on the modelled defaults. */
-            pad.cas = fs.cas_kt / 250.0f;
-            pad.vs = fs.vert_speed_fpm / 2000.0f;
-        }
-
+        /* With no pad every rate command is 0, so the model holds its defaults. */
         flight_step(&fs, &pad);
         flight_transmit(&fs, UART0_BASE);
     }

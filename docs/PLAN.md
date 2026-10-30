@@ -64,14 +64,14 @@ Consequences, both decided with the operator:
 
 | Axis / control | Parameter | Notes |
 |---|---|---|
-| X | Roll | −45…+45° |
-| Y | Pitch | −20…+20°, stick back = pitch up |
-| Z | Calibrated airspeed | 0…250 kt |
-| R | Vertical speed | −2000…+2000 ft/min |
+| X | Roll | rate, up to 30°/s; −45…+45° |
+| Y | Pitch | rate, up to 10°/s; −20…+20°, stick back = pitch up |
+| Z | Calibrated airspeed | rate, up to 25 kt/s; 0…250 kt |
+| R | Vertical speed | rate, up to 1000 ft/min/s; −2000…+2000 ft/min |
 | *derived* | Heading | integrated from roll as a coordinated turn (turn rate ∝ tan(roll)) |
 | *derived* | Baro altitude | integrated from vertical speed |
-| A | Reset pitch/roll trim to neutral | |
-| B | Reset heading to 0 | |
+| A | Wings level: roll and pitch to 0 | axes are rate commands, so this is the quick way back |
+| B (hold 1 s) | Reset heading to 0 | long press: a pad with turbo on B pulses it ~5 Hz |
 | LB / RB | CAS −10 / +10 kt | |
 | D-pad up / down | Altitude +500 / −500 ft | |
 | Start | **Freeze**: firmware sends all labels with SSM = No-Computed-Data | demonstrates the validity path |

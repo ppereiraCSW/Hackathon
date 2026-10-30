@@ -72,15 +72,18 @@ It exits with code 2 and instructions if no pad is plugged in.
 
 ## Controls
 
+The sticks are **rate** controls: deflection changes the value, centring the stick
+holds it where it is.
+
 | Input | Effect |
 |---|---|
-| Left stick X | roll ±45° |
-| Left stick Y | pitch ±20° (stick back = nose up) |
-| Throttle / Z | calibrated airspeed 0–250 kt |
-| Rudder / R | vertical speed ±2000 ft/min |
+| Left stick X | roll, up to 30°/s, held within ±45° |
+| Left stick Y | pitch, up to 10°/s, held within ±20° (stick back = nose up) |
+| Throttle / Z | calibrated airspeed, up to 25 kt/s, 0–250 kt |
+| Rudder / R | vertical speed, up to 1000 ft/min per s, ±2000 ft/min |
 | Heading, altitude | integrated in the firmware (bank → turn, V/S → altitude) |
-| A | reset pitch/roll trim |
-| B | reset heading to 0 |
+| A | wings level (roll and pitch to 0) |
+| B (hold 1 s) | reset heading to 0 |
 | LB / RB | CAS −10 / +10 kt |
 | D-pad up / down | altitude ±500 ft |
 | **START** | freeze — every label sent as **NCD** (demonstrates validity) |
