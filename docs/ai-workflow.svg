@@ -100,7 +100,7 @@
   <text x="684" y="291" class="h3">M2  Firmware</text>
   <text x="684" y="309" class="s">builds with no warnings,</text>
   <text x="684" y="323" class="s">sends the right words</text>
-  <text x="684" y="351" class="s" style="fill:#64748b">check: test-pad-path (17)</text>
+  <text x="684" y="351" class="s" style="fill:#64748b">check: test-pad-path (21)</text>
   <rect x="846" y="272" width="162" height="88" rx="8" class="emb" stroke-width="1.5"/>
   <text x="856" y="291" class="h3">M3  Real gamepad</text>
   <text x="856" y="309" class="s">sticks and buttons move</text>
@@ -197,7 +197,7 @@
   <rect x="330" y="964" width="400" height="66" class="box neu"/>
   <text x="346" y="988" class="h3">Commit (commit-and-review skill)</text>
   <text x="346" y="1008" class="s">feature branch · one imperative sentence · explicit paths</text>
-  <text x="346" y="1023" class="s">push only when you ask · merge to sandbox is your call</text>
+  <text x="346" y="1023" class="s">push only when you ask · merge to main is your call</text>
 
   <path d="M730,997 L778,997" class="flow"/>
   <rect x="780" y="964" width="400" height="66" class="box gate"/>
