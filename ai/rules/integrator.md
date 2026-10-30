@@ -14,7 +14,7 @@
 | `ai/ownership.json` | Who owns which path; the single source for every ownership table |
 | `ai/chain.json` | The run chain: stages M0–M9, owners, deliverables, checks |
 | `.github/workflows/ci.yml`, `.githooks/` | CI and the pre-commit hook |
-| `README.md`, `BRIEF.md`, `package.json`, `.gitignore` | Root files |
+| `README.md`, `BRIEF.md`, `package.json`, `.gitignore`, `start.cmd` | Root files |
 
 ## 2. `shared/labels.json` schema
 
@@ -73,6 +73,7 @@ Procedure:
 
 | Tool | Purpose |
 |---|---|
+| `start.mjs [mode]`, `start.cmd` | Friendly launcher: menu, prerequisite check, gamepad detection, waits for data, opens the SFD, prints controls. Wraps `run-all.mjs`. `npm start` |
 | `run-all.mjs [--keyboard\|--demo\|--no-pad\|--replay]` | Start the input source, QEMU and backend in order; Ctrl+C tears down. Input: gamepad (default), keyboard, scripted demo, none, or replay (backend only) |
 | `test-pad-path.mjs` | 17 checks: synthetic pad frames → firmware → A429 → backend, incl. rate commands, hold on centre, D-pad step, NCD freeze, B long press |
 | `test-keyboard-path.mjs` | 10 checks: the real `host/keyboard-reader.ps1` (keys simulated with `-Hold`) → firmware → A429 → decode. Windows only |

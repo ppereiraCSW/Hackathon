@@ -12,6 +12,18 @@ certification-grade systems are put together. Organised by ASD · Skyline & Borg
 
 ## Quick start
 
+**Double-click `start.cmd`** (or run `npm start`). It shows a menu (gamepad,
+keyboard, scripted demo or recorded replay), suggests the gamepad when one is
+plugged in, waits until flight data flows, opens the flight display in the
+browser and prints the controls. Ctrl+C in that window stops everything.
+
+```bash
+npm start                         # the same menu
+npm run start:keyboard            # skip the menu (also :gamepad, :demo, :replay)
+```
+
+Under the hood it runs `tools/run-all.mjs`, which you can also call directly:
+
 ```bash
 node tools/run-all.mjs            # gamepad + QEMU firmware + backend
 node tools/run-all.mjs --keyboard # no gamepad: fly with the keyboard

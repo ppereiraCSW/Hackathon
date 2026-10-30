@@ -9,6 +9,9 @@ Facts come from `ai/rules/`. Full demo script for people: `docs/DEMO.md`.
 
 ## 1. Pick the mode
 
+For people: `start.cmd` / `npm start` (menu, opens the browser). For agents and
+scripts, call `run-all.mjs` directly as below, or `node tools/start.mjs <mode> --no-browser`.
+
 | Mode | Command | Needs |
 |---|---|---|
 | Full | `node tools/run-all.mjs` | QEMU, toolchain, gamepad |

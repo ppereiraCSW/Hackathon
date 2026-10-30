@@ -23,6 +23,9 @@ If the toolchain moves, edit `TOOLCHAIN_BIN` / `QEMU_BIN` in `firmware/build.mjs
 
 ## Run it
 
+Easiest: double-click `start.cmd` (or `npm start`), pick a mode, and the SFD opens
+in the browser once data is flowing. The direct commands:
+
 ```bash
 node tools/run-all.mjs              # gamepad + QEMU + backend
 node tools/run-all.mjs --keyboard   # fly with the keyboard (Windows)
