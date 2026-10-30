@@ -14,7 +14,9 @@ certification-grade systems are put together. Organised by ASD · Skyline & Borg
 
 ```bash
 node tools/run-all.mjs            # gamepad + QEMU firmware + backend
-node tools/run-all.mjs --no-pad   # no gamepad attached
+node tools/run-all.mjs --keyboard # no gamepad: fly with the keyboard
+node tools/run-all.mjs --demo     # scripted flight, hands off
+node tools/run-all.mjs --no-pad   # no input at all
 node tools/run-all.mjs --replay   # decoupled: backend only, from a recording
 npm test                          # 38 tests
 ```
@@ -88,7 +90,7 @@ Prize categories: **First to Fly** (first fully working solution), **Extra Mile*
 | Path | What it is |
 |------|------------|
 | `firmware/` | Bare-metal ARM Cortex-M3 firmware for QEMU `mps2-an385`: startup, linker script, CMSDK UART driver, pad frame parser, flight model, A429 encoder. Build with `node firmware/build.mjs`. |
-| `host/` | `pad-reader.ps1` (HID input reports, WinMM fallback → TCP frames), `test-pad.ps1` and `test-hid.ps1` (diagnose the pad). PowerShell + .NET only, no npm packages. |
+| `host/` | `pad-reader.ps1` (HID input reports, WinMM fallback → TCP frames), `keyboard-reader.ps1` (the same frames from the keyboard), `test-pad.ps1` and `test-hid.ps1` (diagnose the pad). PowerShell + .NET only, no npm packages. |
 | `backend/` | Node 24, zero dependencies. A429 decode, BNR→engineering units, per-label freshness watchdog, display-config store, HTTP + SSE. `node backend/serve.mjs`. |
 | `frontend/` | `sfd.html` (the Secondary Flight Display) and `config.html` (six sliders). Canvas + SVG, no frameworks. |
 | `shared/` | `labels.json` — the 6-label contract shared by firmware and backend; `a429-vectors.json` — golden vectors; `capture.a429` — a real recording used for the decoupled replay. |
@@ -162,7 +164,8 @@ Every claim below is a command you can run.
 
 ```bash
 npm test                             # 38/38 passing
-node tools/test-pad-path.mjs         # 16/16: pad frames -> firmware -> A429 -> backend
+node tools/test-pad-path.mjs         # 17/17: pad frames -> firmware -> A429 -> backend
+node tools/test-keyboard-path.mjs    # 10/10: keyboard reader -> firmware -> A429 (Windows)
 node tools/verify-pad-live.mjs       # the REAL gamepad through the real pipeline
 node tools/probe-rate.mjs 5          # ~49.8 Hz measured against a 50 Hz target
 node tools/gen-vectors.mjs           # golden vectors, each derived twice and asserted equal
@@ -191,7 +194,7 @@ rule file, and scripts fail when a rule drifts from the code.
 ![AI workflow](docs/ai-workflow.svg)
 
 ```bash
-node tools/chain.mjs --all        # the run chain: milestones M0–M8, status of each
+node tools/chain.mjs --all        # the run chain: milestones M0–M9, status of each
 node tools/check-ai.mjs           # rules, agents, skills vs the code
 node tools/check-ownership.mjs    # which agent owns each changed file
 ```

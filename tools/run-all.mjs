@@ -3,7 +3,9 @@
  * Runs the whole stack, in the right order, and tears it down on Ctrl+C.
  *
  *   node tools/run-all.mjs                # full: pad reader + QEMU + backend
- *   node tools/run-all.mjs --no-pad       # no gamepad (firmware keeps defaults)
+ *   node tools/run-all.mjs --keyboard     # fly with the keyboard instead of the pad
+ *   node tools/run-all.mjs --demo         # scripted flight, nobody at the controls
+ *   node tools/run-all.mjs --no-pad       # no input at all (firmware holds its state)
  *   node tools/run-all.mjs --replay       # DECOUPLED: backend only, from capture
  *
  * Ordering matters: QEMU's UART1 is a TCP *client* to the pad reader's listener,
@@ -30,7 +32,7 @@ const children = [];
 let shuttingDown = false;
 
 function log(tag, msg) {
-    const colors = { backend: '\x1b[36m', qemu: '\x1b[35m', pad: '\x1b[33m', sys: '\x1b[32m' };
+    const colors = { backend: '\x1b[36m', qemu: '\x1b[35m', pad: '\x1b[33m', kbd: '\x1b[33m', demo: '\x1b[33m', sys: '\x1b[32m' };
     const c = colors[tag] ?? '\x1b[0m';
     console.log(`${c}[${tag.padEnd(7)}]\x1b[0m ${msg}`);
 }
@@ -99,7 +101,42 @@ function waitForAnnouncement(register, match, { timeoutMs = 40000, label = 'comp
 
 mkdirSync(join(ROOT, 'build'), { recursive: true });
 
-const mode = has('--replay') ? 'replay' : has('--no-pad') ? 'no-pad' : 'full';
+const mode = has('--replay')
+    ? 'replay'
+    : has('--no-pad')
+      ? 'no-pad'
+      : has('--keyboard')
+        ? 'keyboard'
+        : has('--demo')
+          ? 'demo'
+          : 'full';
+
+/**
+ * Whatever feeds pad frames to QEMU's UART1. All of them listen on PAD_PORT and
+ * speak the same 17-byte frame, so the firmware cannot tell them apart.
+ * `ready` matches the line each one prints once its socket is bound.
+ */
+const PAD_SOURCES = {
+    full: {
+        tag: 'pad',
+        cmd: 'powershell.exe',
+        argv: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(ROOT, 'host', 'pad-reader.ps1'), '-Port', String(PAD_PORT)],
+        ready: /listening on 127\.0\.0\.1:/,
+    },
+    keyboard: {
+        tag: 'kbd',
+        cmd: 'powershell.exe',
+        argv: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(ROOT, 'host', 'keyboard-reader.ps1'), '-Port', String(PAD_PORT)],
+        ready: /listening on 127\.0\.0\.1:/,
+    },
+    demo: {
+        tag: 'demo',
+        cmd: process.execPath,
+        argv: [join(ROOT, 'tools', 'demo-inject.mjs'), '3600'],
+        ready: /listening on/,
+    },
+};
+const padSource = PAD_SOURCES[mode] ?? null;
 
 async function main() {
 log('sys', `mode: ${mode}`);
@@ -123,14 +160,10 @@ if (mode !== 'replay') {
     // and bound the socket, so that line is the readiness signal.
     let padReady = () => {};
     const padAnnounced = new Promise((res) => { padReady = res; });
-    if (mode === 'full') {
-        launch('pad', 'powershell.exe', [
-            '-NoProfile', '-ExecutionPolicy', 'Bypass',
-            '-File', join(ROOT, 'host', 'pad-reader.ps1'),
-            '-Port', String(PAD_PORT),
-        ], {
+    if (padSource) {
+        launch(padSource.tag, padSource.cmd, padSource.argv, {
             onLine: (line) => {
-                if (/listening on 127\.0\.0\.1:/.test(line)) padReady();
+                if (padSource.ready.test(line)) padReady();
             },
         });
     } else {
@@ -153,10 +186,10 @@ if (mode !== 'replay') {
         ]);
     try {
         await withTimeout(backendAnnounced, 20000, 'backend');
-        if (mode === 'full') {
-            await withTimeout(padAnnounced, 40000, 'pad reader (it compiles C# interop first, ~3 s)');
+        if (padSource) {
+            await withTimeout(padAnnounced, 40000, `${padSource.tag} input (PowerShell compiles C# interop first, ~3 s)`);
         }
-        log('sys', mode === 'full' ? 'backend and pad reader are both listening' : 'backend is listening');
+        log('sys', padSource ? `backend and ${padSource.tag} input are both listening` : 'backend is listening');
     } catch (err) {
         log('sys', `cannot start QEMU: ${err.message}`);
         log('sys', 'fix the failing component above, then run again');
@@ -173,8 +206,8 @@ if (mode !== 'replay') {
         '-chardev', `socket,id=u0,host=127.0.0.1,port=${A429_PORT},server=off`,
         '-serial', 'chardev:u0',
     ];
-    // UART1 only exists when a pad reader is listening.
-    if (mode === 'full') {
+    // UART1 only exists when a pad source is listening.
+    if (padSource) {
         argv.push(
             // UART1 RX <- pad reader (we are also a client)
             '-chardev', `socket,id=u1,host=127.0.0.1,port=${PAD_PORT},server=off`,

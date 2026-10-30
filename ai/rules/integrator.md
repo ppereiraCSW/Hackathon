@@ -12,7 +12,7 @@
 | `docs/` | `PLAN.md`, `ARCHITECTURE.md`, `DEMO.md` |
 | `ai/`, `AGENTS.md`, `CLAUDE.md`, `.claude/` | This framework (`.claude/` is generated) |
 | `ai/ownership.json` | Who owns which path; the single source for every ownership table |
-| `ai/chain.json` | The run chain: stages M0–M8, owners, deliverables, checks |
+| `ai/chain.json` | The run chain: stages M0–M9, owners, deliverables, checks |
 | `.github/workflows/ci.yml`, `.githooks/` | CI and the pre-commit hook |
 | `README.md`, `BRIEF.md`, `package.json`, `.gitignore` | Root files |
 
@@ -49,7 +49,7 @@ A contract is anything two layers both depend on:
 |---|---|
 | `shared/labels.json` | backend (runtime), firmware `flight.h` (by hand), frontend (tags), tests |
 | A429 word encoding | `firmware/src/a429.h`, `backend/src/a429/codec.js`, vectors |
-| Pad frame (17 bytes) | `host/pad-reader.ps1`, `firmware/src/pad.h`, `tools/test-pad-path.mjs`, `tools/demo-inject.mjs` |
+| Pad frame (17 bytes) | `host/pad-reader.ps1`, `host/keyboard-reader.ps1`, `firmware/src/pad.h`, `tools/test-pad-path.mjs`, `tools/demo-inject.mjs` |
 | SSE / REST shapes | `backend/src/server.js`, `state.js`, `config.js`, `frontend/js/*.js`, e2e tests |
 | Ports 8090 / 5555 / 5556 | `backend/serve.mjs`, `tools/run-all.mjs`, `host/pad-reader.ps1`, docs |
 
@@ -73,14 +73,15 @@ Procedure:
 
 | Tool | Purpose |
 |---|---|
-| `run-all.mjs [--no-pad] [--replay]` | Start pad reader, QEMU, backend in order; Ctrl+C tears down |
-| `test-pad-path.mjs` | 16 checks: synthetic pad frames → firmware → A429 → backend, incl. rate commands, hold on centre, NCD freeze, B long press |
+| `run-all.mjs [--keyboard\|--demo\|--no-pad\|--replay]` | Start the input source, QEMU and backend in order; Ctrl+C tears down. Input: gamepad (default), keyboard, scripted demo, none, or replay (backend only) |
+| `test-pad-path.mjs` | 17 checks: synthetic pad frames → firmware → A429 → backend, incl. rate commands, hold on centre, D-pad step, NCD freeze, B long press |
+| `test-keyboard-path.mjs` | 10 checks: the real `host/keyboard-reader.ps1` (keys simulated with `-Hold`) → firmware → A429 → decode. Windows only |
 | `verify-pad-live.mjs` | Real pad through the real pipeline, live table |
 | `probe-rate.mjs <s>` | Runs QEMU on port 5555 and measures frame rate; expect ≈ 50 Hz. Assumes 24 bytes/frame and a 12-byte banner |
 | `capture.mjs [s] [out]` | Runs QEMU on port 5570 and records UART0 (default `shared/capture.a429`) |
 | `decode-capture.mjs <file>` | Decode a capture offline |
 | `gen-vectors.mjs` | Regenerate golden vectors |
-| `demo-inject.mjs <s>` | Scripted bank-and-climb in place of the pad |
+| `demo-inject.mjs <s>` | Scripted bank-and-climb in place of the pad; `run-all --demo` starts it |
 | `probe-hid-axes.mjs` | Inspect HID axes |
 | `chain.mjs` | Run chain: stage status, next stage, agent briefs (`run-chain` skill) |
 | `check-ai.mjs [--write]` | Framework vs code: ownership, agents, skills, wrappers, paths, labels, ports, counts |

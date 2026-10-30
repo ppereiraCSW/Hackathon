@@ -152,7 +152,8 @@ and only measuring the output rate reveals it.
 | System | `test/e2e.test.mjs` (6) | live TCP ingest, SSE, stale-on-silence, **decoupled replay** |
 | Visual | browser run | the SFD renders and responds |
 
-Total: **38 automated tests** (`npm test`) plus the 16-check pad-path proof.
+Total: **38 automated tests** (`npm test`) plus the 17-check pad-path proof
+and the 10-check keyboard-path proof.
 
 Golden vectors are computed twice — once by the JS codec, once by an independent
 `handEncode()` — and asserted equal. That is what allows the claim "the C encoder

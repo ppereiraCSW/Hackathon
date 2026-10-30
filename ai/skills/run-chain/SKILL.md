@@ -1,6 +1,6 @@
 ---
 name: run-chain
-description: Build or complete the whole project by walking the run chain (milestones M0-M8) - find the first unfinished stage, brief its owner agent, verify, repeat until every stage passes. Use to implement the project from scratch, resume it on a new machine, or check how complete it is.
+description: Build or complete the whole project by walking the run chain (milestones M0-M9) - find the first unfinished stage, brief its owner agent, verify, repeat until every stage passes. Use to implement the project from scratch, resume it on a new machine, or check how complete it is.
 owner: integrator
 ---
 
@@ -12,7 +12,8 @@ this skill and hands each stage to its owner agent.
 
 ```
 M0 toolchain ──► M2 firmware ──► M3 real pad (hw)
-M1 codec ──────┘      └────────► M7 measured 50 Hz
+M1 codec ──────┘      ├────────► M7 measured 50 Hz
+                      └────────► M9 keyboard input (Windows)
 M1 codec ──► M4 backend ──► M5 pages ──► M6 end to end + replay
 M8 AI framework consistent (independent)
 ```

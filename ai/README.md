@@ -14,7 +14,7 @@ ai/
   rules/           WHAT must be true: every fact, contract and constraint. Specific.
   skills/          HOW to do a recurring task: step-by-step procedures.
   ownership.json   WHERE each agent may edit (single source).
-  chain.json       WHEN: the run chain, stages M0–M8 with owners and checks.
+  chain.json       WHEN: the run chain, stages M0–M9 with owners and checks.
 ```
 
 The split is deliberate:
@@ -57,7 +57,7 @@ per-layer tasks and has the reviewer check the result.
 ## Commands
 
 ```bash
-node tools/chain.mjs --all          # status of every milestone M0–M8
+node tools/chain.mjs --all          # status of every milestone M0–M9
 node tools/chain.mjs --brief M4     # the task brief for one stage's owner
 node tools/check-ai.mjs             # framework vs code; --write regenerates .claude/
 node tools/check-ownership.mjs      # owner of every changed file

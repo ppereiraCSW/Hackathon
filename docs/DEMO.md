@@ -24,8 +24,10 @@ If the toolchain moves, edit `TOOLCHAIN_BIN` / `QEMU_BIN` in `firmware/build.mjs
 ## Run it
 
 ```bash
-node tools/run-all.mjs            # pad reader + QEMU + backend
-node tools/run-all.mjs --no-pad   # no gamepad: firmware holds a default state
+node tools/run-all.mjs              # gamepad + QEMU + backend
+node tools/run-all.mjs --keyboard   # fly with the keyboard (Windows)
+node tools/run-all.mjs --demo       # scripted flight, nobody at the controls
+node tools/run-all.mjs --no-pad     # no input: firmware holds its start state
 node tools/run-all.mjs --replay   # DECOUPLED: backend only, from the recording
 ```
 
@@ -37,12 +39,15 @@ Ctrl+C stops everything.
 
 ### Without a gamepad, or with nobody at the stick
 
-```bash
-node tools/demo-inject.mjs 60
-```
+- `--keyboard` starts `host/keyboard-reader.ps1` in place of the pad reader. Keys
+  work whichever window has the focus, so you can fly while watching the SFD.
+  Key map below, under Controls.
+- `--demo` starts `tools/demo-inject.mjs`, a scripted bank-and-climb. Useful for a
+  screen recording or if the pad is not recognised.
 
-Standing in for `pad-reader.ps1`, it injects a scripted bank-and-climb so the SFD
-visibly moves. Useful for a screen recording or if the pad is not recognised.
+Both send the same frames as the gamepad, so the firmware cannot tell the
+difference. (`--no-pad` gives QEMU no input at all; running `demo-inject.mjs` next
+to it has no effect.)
 
 ### Verifying the physical gamepad (one-time setup check)
 
@@ -85,8 +90,23 @@ holds it where it is.
 | A | wings level (roll and pitch to 0) |
 | B (hold 1 s) | reset heading to 0 |
 | LB / RB | CAS −10 / +10 kt |
-| D-pad up / down | altitude ±500 ft |
+| D-pad up / down | altitude ±500 ft per press |
 | **START** | freeze — every label sent as **NCD** (demonstrates validity) |
+
+### Keyboard (`--keyboard`)
+
+| Key | Effect | Gamepad equivalent |
+|---|---|---|
+| Arrow Left / Right | roll | left stick X |
+| Arrow Up / Down | pitch up / down | left stick Y |
+| W / S | speed up / down | throttle Z |
+| R / F | climb / descend | rudder R |
+| Shift (held) | gentle: about a third of full deflection | partial stick |
+| Space | wings level | A |
+| H (hold 1 s) | reset heading | B |
+| Q / E | CAS −10 / +10 kt | LB / RB |
+| Page Up / Page Down | altitude +500 / −500 ft per press | D-pad |
+| Enter | freeze, every label **NCD**; again to clear | START |
 
 ## The demo script (about 4 minutes)
 
@@ -125,7 +145,7 @@ node tools/decode-capture.mjs shared/capture.a429   # decode a recording offline
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `No joystick found` | pad not plugged in, or seen by neither HID nor WinMM | `powershell -File host/test-pad.ps1` to inspect; use `--no-pad` |
+| `No joystick found` | pad not plugged in, or seen by neither HID nor WinMM | `powershell -File host/test-pad.ps1` to inspect; use `--keyboard` or `--demo` |
 | pad visible but axes frozen | another app grabbed it, or it is asleep | move it; replug |
 | SFD shows NO DATA | backend running but QEMU not connected | check port 5555 is free; restart |
 | all parameters STALE | firmware died | check the QEMU line in the terminal |

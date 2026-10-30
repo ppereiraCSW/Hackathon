@@ -54,7 +54,7 @@
   <text x="36" y="438" class="s">longest match wins.</text>
 
   <text x="36" y="468" class="h3">ai/chain.json · WHEN</text>
-  <text x="36" y="486" class="s">stages M0–M8: owner, deliverables,</text>
+  <text x="36" y="486" class="s">stages M0–M9: owner, deliverables,</text>
   <text x="36" y="502" class="s">automated checks.</text>
 
   <text x="36" y="532" class="h3">Entry points</text>
@@ -83,32 +83,34 @@
   <text x="410" y="218" class="m">node tools/chain.mjs</text>
   <text x="566" y="218" class="s">runs each stage's checks, stops at the first failure and prints the brief for its owner</text>
   <g transform="translate(330,238)">
-    <rect x="0"   y="0" width="88" height="50" rx="8" class="int" stroke-width="1.5"/>
-    <text x="10" y="20" class="h3">M0</text><text x="10" y="38" class="s">toolchain</text>
-    <rect x="94"  y="0" width="88" height="50" rx="8" class="bck" stroke-width="1.5"/>
-    <text x="104" y="20" class="h3">M1</text><text x="104" y="38" class="s">A429 codec</text>
-    <rect x="188" y="0" width="88" height="50" rx="8" class="emb" stroke-width="1.5"/>
-    <text x="198" y="20" class="h3">M2</text><text x="198" y="38" class="s">firmware</text>
-    <rect x="282" y="0" width="88" height="50" rx="8" class="emb" stroke-width="1.5"/>
-    <text x="292" y="20" class="h3">M3</text><text x="292" y="38" class="s">real pad (hw)</text>
-    <rect x="376" y="0" width="88" height="50" rx="8" class="bck" stroke-width="1.5"/>
-    <text x="386" y="20" class="h3">M4</text><text x="386" y="38" class="s">backend</text>
-    <rect x="470" y="0" width="88" height="50" rx="8" class="frt" stroke-width="1.5"/>
-    <text x="480" y="20" class="h3">M5</text><text x="480" y="38" class="s">SFD + config</text>
-    <rect x="564" y="0" width="88" height="50" rx="8" class="int" stroke-width="1.5"/>
-    <text x="574" y="20" class="h3">M6</text><text x="574" y="38" class="s">e2e + replay</text>
-    <rect x="658" y="0" width="88" height="50" rx="8" class="emb" stroke-width="1.5"/>
-    <text x="668" y="20" class="h3">M7</text><text x="668" y="38" class="s">50 Hz measured</text>
-    <rect x="752" y="0" width="98" height="50" rx="8" class="int" stroke-width="1.5"/>
-    <text x="762" y="20" class="h3">M8</text><text x="762" y="38" class="s">framework OK</text>
+    <rect x="0" y="0" width="80" height="50" rx="8" class="int" stroke-width="1.5"/>
+    <text x="9" y="20" class="h3">M0</text><text x="9" y="38" class="s">toolchain</text>
+    <rect x="85" y="0" width="80" height="50" rx="8" class="bck" stroke-width="1.5"/>
+    <text x="94" y="20" class="h3">M1</text><text x="94" y="38" class="s">A429 codec</text>
+    <rect x="170" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
+    <text x="179" y="20" class="h3">M2</text><text x="179" y="38" class="s">firmware</text>
+    <rect x="255" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
+    <text x="264" y="20" class="h3">M3</text><text x="264" y="38" class="s">real pad (hw)</text>
+    <rect x="340" y="0" width="80" height="50" rx="8" class="bck" stroke-width="1.5"/>
+    <text x="349" y="20" class="h3">M4</text><text x="349" y="38" class="s">backend</text>
+    <rect x="425" y="0" width="80" height="50" rx="8" class="frt" stroke-width="1.5"/>
+    <text x="434" y="20" class="h3">M5</text><text x="434" y="38" class="s">SFD + config</text>
+    <rect x="510" y="0" width="80" height="50" rx="8" class="int" stroke-width="1.5"/>
+    <text x="519" y="20" class="h3">M6</text><text x="519" y="38" class="s">e2e + replay</text>
+    <rect x="595" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
+    <text x="604" y="20" class="h3">M7</text><text x="604" y="38" class="s">50 Hz</text>
+    <rect x="680" y="0" width="80" height="50" rx="8" class="int" stroke-width="1.5"/>
+    <text x="689" y="20" class="h3">M8</text><text x="689" y="38" class="s">framework</text>
+    <rect x="765" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
+    <text x="774" y="20" class="h3">M9</text><text x="774" y="38" class="s">keyboard</text>
   </g>
   <text x="330" y="306" class="s">Status per stage: DONE · MANUAL (a person confirms by eye) · FAIL · SKIP (waits, or no toolchain / no pad). Colour = owning agent.</text>
 
   <!-- layer agents -->
   <path d="M1130,192 L1130,236" class="flow"/>
-  <path d="M562,314 C 562,342 465,340 465,368" class="flow"/>
-  <path d="M750,314 C 750,342 755,340 755,368" class="flow"/>
-  <path d="M844,314 C 844,342 1045,340 1045,368" class="flow"/>
+  <path d="M540,314 C 540,342 465,340 465,368" class="flow"/>
+  <path d="M710,314 C 710,342 755,340 755,368" class="flow"/>
+  <path d="M795,314 C 795,342 1045,340 1045,368" class="flow"/>
   <text x="580" y="336" class="s">brief per stage:</text>
   <text x="580" y="352" class="s">goal · paths · rules · checks</text>
 
@@ -118,7 +120,7 @@
   <text x="346" y="438" class="s">rules: common + embedded</text>
   <text x="346" y="456" class="s">bare metal, zero warnings, timing</text>
   <text x="346" y="472" class="s">measured, byte-exact contracts</text>
-  <text x="346" y="500" class="s">done: chain M2 (and M7, M3)</text>
+  <text x="346" y="500" class="s">done: chain M2, M3, M7, M9</text>
 
   <rect x="620" y="370" width="270" height="150" class="box bck"/>
   <text x="636" y="396" class="h2">Backend agent</text>

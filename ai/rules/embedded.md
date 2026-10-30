@@ -102,7 +102,8 @@ how fast a value changes, a centred stick holds it. All four axes use
   freeze (edge).
 - The demo pad auto-fires B at about 5 Hz (turbo). Any destructive action must
   need a hold, never a single edge, or the pad triggers it by itself.
-- D-pad up/down: altitude ±500 ft per frame while held (not edge-triggered).
+- D-pad up/down: altitude ±500 ft **per press** (edge-triggered on `prev_pov`). It
+  used to step on every 50 Hz tick while held, 25,000 ft/s; fixed 2026-10-30.
 - Freeze: every label is sent with SSM = NCD. It demonstrates the validity path.
 - No pad frame ever received: every rate command is 0, so the model holds its
   `flight_init` values (5000 ft, 120 kt, level, heading 0).
@@ -134,14 +135,38 @@ how fast a value changes, a centred stick holds it. All four axes use
   once. Never probe its port to check readiness: the probe takes the slot and QEMU
   is locked out. `tools/run-all.mjs` waits for its printed ready line instead.
 - `test-pad.ps1` and `test-hid.ps1` are diagnostics; keep them read-only.
+- `keyboard-reader.ps1` is the second frame producer: same port, same 17-byte
+  frame, same ready line, same absolute 50 Hz schedule. Keys are polled with
+  `GetAsyncKeyState`, so they work whichever window has the focus; only the
+  mapped keys are queried and nothing is recorded. Key map:
+
+| Key | Effect | Gamepad equivalent |
+|---|---|---|
+| Arrow Left / Right | roll | left stick X |
+| Arrow Up / Down | pitch up / down | left stick Y |
+| W / S | speed up / down | throttle Z |
+| R / F | climb / descend | rudder R |
+| Shift (held) | gentle: about a third of full deflection | partial stick |
+| Space | wings level | A |
+| H (hold 1 s) | reset heading | B |
+| Q / E | CAS −10 / +10 kt | LB / RB |
+| Page Up / Page Down | altitude +500 / −500 ft per press | D-pad |
+| Enter | freeze, every label **NCD**; again to clear | START |
+
+  Keys map to full deflection (0 / 65535), Shift to 35 % of it. Buttons and
+  D-pad are sent for as long as the key is held; the firmware does the edge
+  detection, and B needs the hold. `-Hold Right,W` fakes held keys for tests
+  without touching the real keyboard.
+- Any change to the frame layout now touches **both** readers.
 
 ## 10. Verification for embedded changes
 
 | Change | Must pass |
 |---|---|
-| Any firmware code | `node tools/chain.mjs --stage M2` (build with zero warnings, `test-pad-path` 16/16) |
+| Any firmware code | `node tools/chain.mjs --stage M2` (build with zero warnings, `test-pad-path` 17/17) |
 | Timing | `node tools/chain.mjs --stage M7` (`probe-rate` ≈ 50 Hz) |
 | Encoder | `npm run test:a429`, `node tools/test-pad-path.mjs` |
 | Host reader | `node tools/verify-pad-live.mjs` with the pad attached, or say it was not run |
+| Keyboard reader | `node tools/chain.mjs --stage M9` (`test-keyboard-path` 10/10) |
 | Always | `npm test`, all pass |
 | No toolchain on this machine | say so; CI runs M2 and M7 on push |

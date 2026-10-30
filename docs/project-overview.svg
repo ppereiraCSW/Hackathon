@@ -163,7 +163,7 @@
   <text x="40" y="720" class="m" style="fill:#94a3b8">open http://127.0.0.1:8090/sfd and /config</text>
   <text x="620" y="630" class="h3" style="fill:#f8fafc">Prove it</text>
   <text x="620" y="654" class="m" style="fill:#e2e8f0">npm test</text><text x="880" y="654" class="m" style="fill:#e2e8f0"># 38 tests</text>
-  <text x="620" y="674" class="m" style="fill:#e2e8f0">node tools/test-pad-path.mjs</text><text x="880" y="674" class="m" style="fill:#e2e8f0"># 16 checks through QEMU</text>
+  <text x="620" y="674" class="m" style="fill:#e2e8f0">node tools/test-pad-path.mjs</text><text x="880" y="674" class="m" style="fill:#e2e8f0"># 17 checks through QEMU</text>
   <text x="620" y="694" class="m" style="fill:#e2e8f0">node tools/probe-rate.mjs 5</text><text x="880" y="694" class="m" style="fill:#e2e8f0"># measured ~50 Hz</text>
-  <text x="620" y="720" class="m" style="fill:#e2e8f0">node tools/chain.mjs --all</text><text x="880" y="720" class="m" style="fill:#e2e8f0"># every milestone M0–M8</text>
+  <text x="620" y="720" class="m" style="fill:#e2e8f0">node tools/chain.mjs --all</text><text x="880" y="720" class="m" style="fill:#e2e8f0"># every milestone M0–M9</text>
 </svg>

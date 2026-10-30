@@ -18,14 +18,14 @@ Display. See `README.md`, `docs/ARCHITECTURE.md` and `docs/project-overview.svg`
 ## Agents
 
 - `ai/agents/integrator.md` — coordinator; owns shared contracts, tools, docs, CI.
-- `ai/agents/embedded.md` — firmware and host pad reader.
+- `ai/agents/embedded.md` — firmware and host input readers (gamepad, keyboard).
 - `ai/agents/backend.md` — A429 decode, state, config, HTTP/SSE.
 - `ai/agents/frontend.md` — SFD and config pages.
 - `ai/agents/reviewer.md` — read-only review against the rules.
 
 ## Skills
 
-- `ai/skills/run-chain/SKILL.md` — build or audit the project, milestones M0–M8
+- `ai/skills/run-chain/SKILL.md` — build or audit the project, milestones M0–M9
 - `ai/skills/build-and-test/SKILL.md`
 - `ai/skills/add-a429-parameter/SKILL.md`
 - `ai/skills/run-and-verify-demo/SKILL.md`

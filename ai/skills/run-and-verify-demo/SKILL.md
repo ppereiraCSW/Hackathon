@@ -12,12 +12,14 @@ Facts come from `ai/rules/`. Full demo script for people: `docs/DEMO.md`.
 | Mode | Command | Needs |
 |---|---|---|
 | Full | `node tools/run-all.mjs` | QEMU, toolchain, gamepad |
-| No pad | `node tools/run-all.mjs --no-pad` | QEMU, toolchain |
+| Keyboard | `node tools/run-all.mjs --keyboard` | QEMU, toolchain, Windows |
+| Scripted demo | `node tools/run-all.mjs --demo` | QEMU, toolchain |
+| No input | `node tools/run-all.mjs --no-pad` | QEMU, toolchain |
 | Replay (decoupled) | `node tools/run-all.mjs --replay` | Node only |
 
-Default to **replay** when unsure: it needs nothing but Node. Use **no pad** plus
-`node tools/demo-inject.mjs 60` in a second terminal for a moving display without
-a pad.
+Default to **replay** when unsure: it needs nothing but Node. For a moving display
+without a gamepad, use **demo** (scripted) or **keyboard** (you fly it; key map in
+`ai/rules/embedded.md` §9). **No input** holds the model still: nothing feeds UART1.
 
 Run it in the background; it runs until stopped. Stop with Ctrl+C, or end the
 process, before running `npm test` (port 8090 / 5555 conflicts).

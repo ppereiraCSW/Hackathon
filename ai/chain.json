@@ -7,7 +7,9 @@
       "owner": "integrator",
       "dependsOn": [],
       "goal": "Arm GNU Toolchain and QEMU are installed and reachable by firmware/build.mjs (default paths, or ARM_TOOLCHAIN_BIN / QEMU_BIN).",
-      "deliverables": ["firmware/build.mjs (TOOLCHAIN_BIN, QEMU_BIN)"],
+      "deliverables": [
+        "firmware/build.mjs (TOOLCHAIN_BIN, QEMU_BIN)"
+      ],
       "checks": [
         {
           "run": "node -e \"import('./firmware/build.mjs').then((m) => { m.gccPath(); m.qemuPath(); console.log('toolchain ok') })\""
@@ -27,15 +29,24 @@
         "shared/labels.json (integrator)",
         "shared/a429-vectors.json via tools/gen-vectors.mjs (integrator)"
       ],
-      "checks": [{ "run": "node --test test/a429.test.mjs" }],
+      "checks": [
+        {
+          "run": "node --test test/a429.test.mjs"
+        }
+      ],
       "skill": "build-and-test"
     },
     {
       "id": "M2",
       "title": "Firmware builds and its words decode correctly",
       "owner": "embedded",
-      "dependsOn": ["M0", "M1"],
-      "needs": ["toolchain"],
+      "dependsOn": [
+        "M0",
+        "M1"
+      ],
+      "needs": [
+        "toolchain"
+      ],
       "goal": "Bare-metal Cortex-M3 image for QEMU mps2-an385 that parses pad frames on UART1 and emits six A429 words per 50 Hz tick on UART0.",
       "deliverables": [
         "firmware/src/startup.c",
@@ -47,8 +58,14 @@
         "firmware/src/main.c"
       ],
       "checks": [
-        { "run": "node firmware/build.mjs", "failOn": "warning:" },
-        { "run": "node tools/test-pad-path.mjs", "failOn": "FAIL" }
+        {
+          "run": "node firmware/build.mjs",
+          "failOn": "warning:"
+        },
+        {
+          "run": "node tools/test-pad-path.mjs",
+          "failOn": "FAIL"
+        }
       ],
       "skill": "build-and-test"
     },
@@ -56,19 +73,35 @@
       "id": "M3",
       "title": "Pad reader streams the real gamepad",
       "owner": "embedded",
-      "dependsOn": ["M2"],
-      "needs": ["toolchain", "windows", "pad"],
+      "dependsOn": [
+        "M2"
+      ],
+      "needs": [
+        "toolchain",
+        "windows",
+        "pad"
+      ],
       "manual": "Move each stick and press each button; the live table must show the matching parameter change.",
       "goal": "host/pad-reader.ps1 reads the gamepad (HID, WinMM fallback) and streams 17-byte frames at 50 Hz to QEMU.",
-      "deliverables": ["host/pad-reader.ps1", "host/test-pad.ps1", "host/test-hid.ps1"],
-      "checks": [{ "run": "node tools/verify-pad-live.mjs --seconds 20" }],
+      "deliverables": [
+        "host/pad-reader.ps1",
+        "host/test-pad.ps1",
+        "host/test-hid.ps1"
+      ],
+      "checks": [
+        {
+          "run": "node tools/verify-pad-live.mjs --seconds 20"
+        }
+      ],
       "skill": "run-and-verify-demo"
     },
     {
       "id": "M4",
       "title": "Backend decodes, converts and judges freshness",
       "owner": "backend",
-      "dependsOn": ["M1"],
+      "dependsOn": [
+        "M1"
+      ],
       "goal": "ParamState with watchdog and resync, DisplayConfig, HTTP + SSE server, live and replay ingest.",
       "deliverables": [
         "backend/src/state.js",
@@ -77,14 +110,20 @@
         "backend/serve.mjs",
         "test/state.test.mjs"
       ],
-      "checks": [{ "run": "node --test test/state.test.mjs" }],
+      "checks": [
+        {
+          "run": "node --test test/state.test.mjs"
+        }
+      ],
       "skill": "build-and-test"
     },
     {
       "id": "M5",
       "title": "SFD and config pages",
       "owner": "frontend",
-      "dependsOn": ["M4"],
+      "dependsOn": [
+        "M4"
+      ],
       "manual": "Open /sfd and /config with `node tools/run-all.mjs --replay`; move a slider and see the SFD scale follow; check the STALE/NCD flags.",
       "goal": "Secondary Flight Display and one slider set per parameter, fed by SSE, with full validity flags.",
       "deliverables": [
@@ -95,28 +134,59 @@
         "frontend/css/app.css",
         "frontend/css/sfd.css"
       ],
-      "checks": [{ "run": "node --test --test-name-pattern=\"both pages\" test/e2e.test.mjs" }],
+      "checks": [
+        {
+          "run": "node --test --test-name-pattern=\"both pages\" test/e2e.test.mjs"
+        }
+      ],
       "skill": "run-and-verify-demo"
     },
     {
       "id": "M6",
       "title": "End to end and decoupled replay",
       "owner": "integrator",
-      "dependsOn": ["M4", "M5"],
+      "dependsOn": [
+        "M4",
+        "M5"
+      ],
       "goal": "Live TCP ingest reaches the browser; the backend replays a real capture with QEMU and the pad absent.",
-      "deliverables": ["test/e2e.test.mjs", "shared/capture.a429", "tools/run-all.mjs", "tools/capture.mjs"],
-      "checks": [{ "run": "node --test test/e2e.test.mjs" }, { "run": "npm test" }],
+      "deliverables": [
+        "test/e2e.test.mjs",
+        "shared/capture.a429",
+        "tools/run-all.mjs",
+        "tools/capture.mjs"
+      ],
+      "checks": [
+        {
+          "run": "node --test test/e2e.test.mjs"
+        },
+        {
+          "run": "npm test"
+        }
+      ],
       "skill": "run-and-verify-demo"
     },
     {
       "id": "M7",
       "title": "Measured 50 Hz",
       "owner": "embedded",
-      "dependsOn": ["M2"],
-      "needs": ["toolchain"],
+      "dependsOn": [
+        "M2"
+      ],
+      "needs": [
+        "toolchain"
+      ],
       "goal": "The firmware's real word rate is about 50 Hz, measured, not inferred.",
-      "deliverables": ["firmware/src/main.c (timebase)", "tools/probe-rate.mjs"],
-      "checks": [{ "run": "node tools/probe-rate.mjs 5", "expect": "rate=(49|50)\\.\\d+ Hz" }],
+      "deliverables": [
+        "firmware/src/main.c (timebase)",
+        "tools/probe-rate.mjs"
+      ],
+      "checks": [
+        {
+          "run": "node tools/probe-rate.mjs 5",
+          "expect": "rate=(49|50)\\.\\d+ Hz"
+        }
+      ],
       "skill": "build-and-test"
     },
     {
@@ -125,9 +195,45 @@
       "owner": "integrator",
       "dependsOn": [],
       "goal": "Rules, agents, skills, ownership and Claude Code wrappers agree with the code; CI runs the chain.",
-      "deliverables": ["ai/", "AGENTS.md", ".claude/", ".github/workflows/ci.yml", ".githooks/pre-commit"],
-      "checks": [{ "run": "node tools/check-ai.mjs" }],
+      "deliverables": [
+        "ai/",
+        "AGENTS.md",
+        ".claude/",
+        ".github/workflows/ci.yml",
+        ".githooks/pre-commit"
+      ],
+      "checks": [
+        {
+          "run": "node tools/check-ai.mjs"
+        }
+      ],
       "skill": "commit-and-review"
+    },
+    {
+      "id": "M9",
+      "title": "Keyboard input",
+      "owner": "embedded",
+      "dependsOn": [
+        "M2"
+      ],
+      "needs": [
+        "toolchain",
+        "windows"
+      ],
+      "manual": "`node tools/run-all.mjs --keyboard`, open /sfd, fly with the arrows and W/S/R/F.",
+      "goal": "host/keyboard-reader.ps1 flies the aircraft from the keyboard with the gamepad's frame protocol, as the brief's mouse-and-keyboard fallback.",
+      "deliverables": [
+        "host/keyboard-reader.ps1",
+        "tools/test-keyboard-path.mjs",
+        "tools/run-all.mjs (--keyboard)"
+      ],
+      "checks": [
+        {
+          "run": "node tools/test-keyboard-path.mjs",
+          "failOn": "FAIL"
+        }
+      ],
+      "skill": "run-and-verify-demo"
     }
   ]
 }

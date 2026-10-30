@@ -54,7 +54,7 @@ npm test
 ```
 Build:  node firmware/build.mjs -> ok, 0 warnings     (or: not run, why)
 Tests:  npm test -> 38/38 pass
-Extra:  node tools/test-pad-path.mjs -> 16/16
+Extra:  node tools/test-pad-path.mjs -> 17/17
 Not run: <command> - <reason>
 ```
 

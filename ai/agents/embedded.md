@@ -1,6 +1,6 @@
 ---
 name: embedded
-description: Embedded layer agent. Use for firmware (bare-metal C, linker script, startup, UART, flight model, A429 encoder) and the host-side gamepad reader scripts.
+description: Embedded layer agent. Use for firmware (bare-metal C, linker script, startup, UART, flight model, A429 encoder) and the host-side input readers (gamepad and keyboard).
 rules: [ai/rules/common.md, ai/rules/embedded.md]
 skills: [build-and-test, run-and-verify-demo, debug-pipeline, commit-and-review]
 ---
