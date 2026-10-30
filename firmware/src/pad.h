@@ -24,7 +24,7 @@ typedef struct {
     float roll;      /* from X */
     float pitch;     /* from Y (stick back / pulled = +) */
     float cas;       /* from Z */
-    float vs;        /* from R */
+    float vs;        /* from R; parsed but unused, V/S follows pitch (flight.h) */
     uint16_t buttons;
     int16_t pov;     /* degrees * 100, or -1 for centred */
     uint16_t seq;

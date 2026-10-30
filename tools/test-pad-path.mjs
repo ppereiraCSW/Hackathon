@@ -12,97 +12,18 @@
  *
  * Usage: node tools/test-pad-path.mjs
  */
-import { spawn } from 'node:child_process';
-import { createServer as createTcpServer, connect } from 'node:net';
-import { createServer as createHttpServer } from 'node:http';
-import { readFileSync } from 'node:fs';
-import { qemuPath } from '../firmware/build.mjs';
-import { ParamState } from '../backend/src/state.js';
+import { startFirmware, sleep } from './fw-harness.mjs';
 
 const PAD_PORT = 5586;
 const A429_PORT = 5585;
-const HTTP_PORT = 8199;
-
-const labelsDoc = JSON.parse(readFileSync('shared/labels.json', 'utf8'));
-
-/** Build a pad frame exactly as host/pad-reader.ps1 does. */
-function padFrame({ seq = 0, x = 32767, y = 32767, z = 32767, r = 32767, buttons = 0, pov = -1 }) {
-    const b = Buffer.alloc(17);
-    b[0] = 0xa5;
-    b[1] = 0x5a;
-    b.writeUInt16LE(seq & 0xffff, 2);
-    b.writeUInt16LE(x, 4);
-    b.writeUInt16LE(y, 6);
-    b.writeUInt16LE(z, 8);
-    b.writeUInt16LE(r, 10);
-    b.writeUInt16LE(buttons, 12);
-    b.writeInt16LE(pov, 14);
-    let xor = 0;
-    for (let i = 0; i < 16; i++) xor ^= b[i];
-    b[16] = xor;
-    return b;
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-    // 1. pad-frame server: QEMU connects here for UART1.
-    let padSock = null;
-    const padServer = createTcpServer((s) => {
-        padSock = s;
-        s.on('error', () => {});
-    });
-    await new Promise((r) => padServer.listen(PAD_PORT, '127.0.0.1', r));
-
-    // 2. A429 collector: QEMU connects here for UART0.
-    const state = new ParamState(labelsDoc);
-    let pending = Buffer.alloc(0);
-    const a429Server = createTcpServer((s) => {
-        s.on('data', (d) => {
-            pending = Buffer.concat([pending, d]);
-            pending = Buffer.from(state.ingestChunk(pending));
-        });
-        s.on('error', () => {});
-    });
-    await new Promise((r) => a429Server.listen(A429_PORT, '127.0.0.1', r));
-
-    // 3. Boot the firmware pointed at both.
-    const qemu = spawn(qemuPath(), [
-        '-M', 'mps2-an385', '-cpu', 'cortex-m3', '-nographic', '-monitor', 'none',
-        '-chardev', `socket,id=u0,host=127.0.0.1,port=${A429_PORT},server=off`,
-        '-serial', 'chardev:u0',
-        '-chardev', `socket,id=u1,host=127.0.0.1,port=${PAD_PORT},server=off`,
-        '-serial', 'chardev:u1',
-        '-kernel', 'firmware/build/firmware-main.elf',
-    ], { stdio: 'ignore' });
-
+    const { send, hold, values, state, close } = await startFirmware({ padPort: PAD_PORT, a429Port: A429_PORT });
     try {
-        // Wait for the guest to connect both UARTs.
-        for (let i = 0; i < 100 && !padSock; i++) await sleep(50);
-        if (!padSock) throw new Error('firmware never connected UART1');
-
-        let seq = 0;
-        const send = (opts) => {
-            seq++;
-            padSock.write(padFrame({ seq, ...opts }));
-        };
-
-        const values = () => {
-            const snap = state.snapshot();
-            return Object.fromEntries(snap.params.map((p) => [p.tag, p.valid ? p.value : null]));
-        };
-
         const expect = (label, actual, want, tol) => {
             const ok = actual !== null && Math.abs(actual - want) <= tol;
             console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(26)} got ${actual === null ? 'null' : actual.toFixed(2)}  want ~${want}`);
             return ok;
-        };
-
-        /** Hold one stick state for `ms`, sending frames at the reader's 50 Hz. */
-        const hold = async (opts, ms) => {
-            for (let t = 0; t < ms; t += 20) { send(opts); await sleep(20); }
-            await sleep(120);
-            return values();
         };
 
         let failures = 0;
@@ -173,9 +94,29 @@ async function main() {
         console.log(`  ${casOk ? 'PASS' : 'FAIL'}  CAS rate                   +${casUp.toFixed(1)} kt in 1 s  want ~25`);
         results.push(casOk);
 
-        // ---- vertical speed up 2.5 s at 1000 fpm/s -> +2000
-        v = await hold({ r: 65535 }, 2500);
-        results.push(expect('VS full up -> limit', v.VERT_SPEED, 2000, 40));
+        // ---- V/S follows pitch and airspeed, altitude follows V/S
+        const vsWant = (p) => p.CAS * 101.2686 * Math.sin((p.PITCH * Math.PI) / 180);
+        v = await hold({}, 200);
+        results.push(expect('nose down -> V/S = CAS*sin', v.VERT_SPEED, Math.round(vsWant(v)), 30));
+        const altBefore = v.BARO_ALT;
+        v = await hold({}, 1000);
+        const altOk = v.BARO_ALT < altBefore - 30;
+        console.log(`  ${altOk ? 'PASS' : 'FAIL'}  nose down -> altitude falls ${altBefore.toFixed(0)} -> ${v.BARO_ALT.toFixed(0)} ft`);
+        results.push(altOk);
+        v = await hold({ y: 65535 }, 4500);
+        results.push(expect('nose up -> V/S = CAS*sin', v.VERT_SPEED, Math.round(vsWant(v)), 30));
+        const climbOk = v.VERT_SPEED > 1000;
+        console.log(`  ${climbOk ? 'PASS' : 'FAIL'}  nose up climbs             V/S ${v.VERT_SPEED.toFixed(0)} ft/min`);
+        results.push(climbOk);
+        await hold({ buttons: 0x0001 }, 80);
+        v = await hold({}, 200);
+        results.push(expect('wings level -> V/S 0', v.VERT_SPEED, 0, 5));
+
+        // ---- D-pad up held 1 s steps altitude ONCE, not every tick
+        const altHeld = v.BARO_ALT;
+        v = await hold({ pov: 0 }, 1000);
+        results.push(expect('D-pad up held -> +500 once', v.BARO_ALT - altHeld, 500, 8));
+        await hold({}, 100);
 
         // ---- START button toggles NCD on every label
         for (let i = 0; i < 4; i++) { send({ buttons: 0x0010 }); await sleep(20); }
@@ -200,10 +141,7 @@ async function main() {
         console.log(`A429 words decoded by the backend: ${state.snapshot().stats.words}`);
         if (failures) process.exitCode = 1;
     } finally {
-        qemu.kill();
-        padSock?.destroy();
-        padServer.close();
-        a429Server.close();
+        close();
     }
 }
 

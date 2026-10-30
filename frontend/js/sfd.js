@@ -7,9 +7,25 @@
  *
  * The display never computes a flight quantity: every number shown is either a
  * value the backend decoded from ARINC 429 or the user's display configuration.
- * Only the graphics (horizon, tapes, heading arc) are eased between updates so
- * motion is smooth; the numeric readouts always show the decoded value.
+ * Values are eased between updates so motion is smooth; graphics and readouts
+ * use the same eased value, so a tape never trails its own number.
+ *
+ * Every instrument follows the same rules (see view()):
+ *   - the display min/max are the LIMITS of the instrument's scale: the scale
+ *     ends there, and a value beyond them pins the graphic at the limit and
+ *     turns the readout amber. Each instrument shows a fixed window of its
+ *     scale, so the sliders never squeeze a range into the tape.
+ *   - invalid (INOP / NCD / STALE): graphic blanked, readout '—', flag shown.
+ *   - hidden (slider page "show on SFD" off): graphic blanked, readout '—',
+ *     instrument dimmed.
  */
+
+import { formatValue } from './format.js';
+import { setEnabled, isEnabled, updateAlerts } from './alerts.js';
+
+/** Callout thresholds, on the decoded values. */
+const BANK_ANGLE_DEG = 35;
+const SINK_RATE_FPM = -3000;
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,48 +33,72 @@ const $ = (id) => document.getElementById(id);
 const params = new Map();
 /** Latest display config, keyed by tag. */
 const display = new Map();
-/** Value the graphics currently show per tag, eased toward params each frame. */
+/** Value currently shown per tag, eased toward params each frame. */
 const shown = new Map();
 /** Easing time constant: short enough to feel direct, long enough to hide steps. */
 const SMOOTH_TAU_MS = 60;
 
-/** Eased value for drawing; falls back to the decoded value. */
+/** Eased value; falls back to the decoded value. */
 function eased(tag) {
   const p = params.get(tag);
   if (!p) return null;
   return shown.has(tag) ? shown.get(tag) : p.value;
 }
 
-/* ------------------------------------------------------------------ helpers */
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-/** Map a value onto 0..1 across the configured display window, clamped. */
-function norm(value, c) {
-  if (!c) return 0.5;
-  const span = c.max - c.min;
-  if (span <= 0) return 0.5;
-  return Math.min(1, Math.max(0, (value - c.min) / span));
+/**
+ * The one rule set every instrument draws from.
+ * `g` is the value to draw (pinned to the limits), or null to blank the graphic.
+ */
+function view(tag) {
+  const p = params.get(tag);
+  const c = display.get(tag);
+  const valid = !!(p && p.valid);
+  const visible = !!(c && c.visible);
+  const v = valid ? eased(tag) : null;
+  const show = valid && visible && !!c;
+  return {
+    c,
+    valid,
+    visible,
+    stale: !!(p && p.stale),
+    g: show ? clamp(v, c.min, c.max) : null,
+    over: show && (v < c.min || v > c.max),
+    text: show ? formatValue(tag, v) : '—',
+    flag: p && p.stale ? 'STALE' : p && p.ssm === 'NCD' ? 'NCD' : 'INOP',
+  };
 }
 
-function fmt(value, digits = 0) {
-  if (value === null || value === undefined) return '—';
-  return value.toFixed(digits);
+/** Apply failed / stale / hidden to an instrument element and its flag. */
+function applyState(el, flag, v) {
+  el.classList.toggle('failed', !v.valid);
+  el.classList.toggle('stale', v.stale);
+  el.classList.toggle('hidden-param', !v.visible);
+  flag.textContent = v.flag;
 }
 
 /* ---------------------------------------------------------------- ADI (SVG) */
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 const ADI = {
   pxPerDeg: 6.2,
-  buildLadder() {
+  ladderKey: '',
+  rollKey: '',
+  /** Pitch ladder, drawn only between the PITCH display limits. */
+  buildLadder(c) {
+    const key = `${c.min}:${c.max}`;
+    if (key === ADI.ladderKey) return;
+    ADI.ladderKey = key;
     const g = $('ladder');
-    if (!g || g.dataset.built) return;
-    const ns = 'http://www.w3.org/2000/svg';
+    g.replaceChildren();
     for (let deg = -90; deg <= 90; deg += 2.5) {
-      if (deg === 0) continue;
+      if (deg === 0 || deg < c.min || deg > c.max) continue;
       const major = Math.abs(deg) % 10 < 0.01;
       const w = major ? 130 : 62;
       const y = 160 - deg * ADI.pxPerDeg;
-      if (Math.abs(y - 160) > 260) continue;
-      const line = document.createElementNS(ns, 'line');
+      const line = document.createElementNS(SVG_NS, 'line');
       line.setAttribute('x1', String(160 - w / 2));
       line.setAttribute('x2', String(160 + w / 2));
       line.setAttribute('y1', String(y));
@@ -66,50 +106,91 @@ const ADI = {
       if (deg < 0) line.setAttribute('stroke-dasharray', '6 4');
       g.append(line);
       if (major) {
-        const t = document.createElementNS(ns, 'text');
-        t.setAttribute('x', '26');
-        t.setAttribute('y', String(y + 4));
-        t.setAttribute('text-anchor', 'end');
-        t.textContent = String(Math.abs(deg));
-        g.append(t);
-        const t2 = document.createElementNS(ns, 'text');
-        t2.setAttribute('x', '294');
-        t2.setAttribute('y', String(y + 4));
-        t2.setAttribute('text-anchor', 'start');
-        t2.textContent = String(Math.abs(deg));
-        g.append(t2);
+        // Just outside the line ends, well inside the bezel clip; no stroke,
+        // or the ladder's line stroke smears the digits.
+        for (const [x, anchor] of [['89', 'end'], ['231', 'start']]) {
+          const t = document.createElementNS(SVG_NS, 'text');
+          t.setAttribute('stroke', 'none');
+          t.setAttribute('x', x);
+          t.setAttribute('y', String(y + 4));
+          t.setAttribute('text-anchor', anchor);
+          t.textContent = String(Math.abs(deg));
+          g.append(t);
+        }
       }
     }
-    g.dataset.built = '1';
+  },
+  /** Bezel roll scale, ticks only between the ROLL display limits. */
+  buildRollScale(c) {
+    const key = `${c.min}:${c.max}`;
+    if (key === ADI.rollKey) return;
+    ADI.rollKey = key;
+    const g = $('roll-scale');
+    g.replaceChildren();
+    for (const deg of [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60]) {
+      if (deg < c.min || deg > c.max) continue;
+      const long = deg % 30 === 0;
+      // A right bank (positive roll) moves the sky pointer left, so the tick
+      // for roll `deg` sits at screen angle -deg from the top.
+      const a = (-deg * Math.PI) / 180;
+      const r0 = 150;
+      const r1 = long ? 134 : 141;
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', (160 + r0 * Math.sin(a)).toFixed(2));
+      line.setAttribute('y1', (160 - r0 * Math.cos(a)).toFixed(2));
+      line.setAttribute('x2', (160 + r1 * Math.sin(a)).toFixed(2));
+      line.setAttribute('y2', (160 - r1 * Math.cos(a)).toFixed(2));
+      g.append(line);
+    }
   },
   render() {
-    ADI.buildLadder();
-    const p = params.get('PITCH');
-    const r = params.get('ROLL');
-    const pitch = p && p.valid ? eased('PITCH') : 0;
-    const roll = r && r.valid ? eased('ROLL') : 0;
+    const vp = view('PITCH');
+    const vr = view('ROLL');
+    if (vp.c) ADI.buildLadder(vp.c);
+    if (vr.c) ADI.buildRollScale(vr.c);
 
-    const world = $('adi-world');
-    if (world) {
-      // Shift the horizon by pitch, then rotate around the centre by roll.
-      world.setAttribute(
-        'transform',
-        `rotate(${-roll.toFixed(2)} 160 160) translate(0 ${(pitch * ADI.pxPerDeg).toFixed(2)})`,
-      );
+    // Attitude is one picture: if either axis is invalid, none of it is drawn.
+    const panel = $('adi-panel');
+    panel.classList.toggle('failed', !vp.valid || !vr.valid);
+    panel.classList.toggle('stale', vp.stale || vr.stale);
+    panel.classList.toggle('hidden-param', !vp.visible && !vr.visible);
+    const bad = !vp.valid ? vp : vr;
+    $('f-att').textContent = `ATT ${bad.flag}`;
+    $('adi-att').style.display = vp.valid && vr.valid ? '' : 'none';
+
+    const pitch = vp.g ?? 0;
+    const roll = vr.g ?? 0;
+    $('ladder').style.display = vp.g === null ? 'none' : '';
+    $('roll-pointer').style.display = vr.g === null ? 'none' : '';
+    $('roll-scale').style.display = vr.g === null ? 'none' : '';
+    $('adi-roll').setAttribute('transform', `rotate(${(-roll).toFixed(2)} 160 160)`);
+    $('adi-world').setAttribute('transform', `translate(0 ${(pitch * ADI.pxPerDeg).toFixed(2)})`);
+
+    for (const [id, v] of [['r-pitch', vp], ['r-roll', vr]]) {
+      const el = $(id);
+      el.classList.toggle('hidden-param', !v.visible);
+      const b = el.querySelector('b');
+      b.textContent = v.text === '—' ? '—' : `${v.text}°`;
+      b.classList.toggle('over', v.over);
     }
-    $('r-pitch').innerHTML = `PITCH <b>${p && p.valid ? p.value.toFixed(1) + '°' : '—'}</b>`;
-    $('r-roll').innerHTML = `ROLL <b>${r && r.valid ? r.value.toFixed(1) + '°' : '—'}</b>`;
   },
 };
 
 /* --------------------------------------------------------------- tape draw */
 
+/** Fixed visible window per tape, in engineering units, and its tick spacing. */
+const TAPES = {
+  CAS: { el: 'tape-cas', cv: 'cv-cas', val: 'v-cas', flag: 'f-cas', window: 80, majorStep: 10, minorStep: 5, side: 'left' },
+  VERT_SPEED: { el: 'tape-vs', cv: 'cv-vs', val: 'v-vs', flag: 'f-vs', window: 4000, majorStep: 500, minorStep: 250, side: 'left' },
+  BARO_ALT: { el: 'tape-alt', cv: 'cv-alt', val: 'v-alt', flag: 'f-alt', window: 2000, majorStep: 500, minorStep: 100, side: 'right' },
+};
+
 /**
- * Draw a linear tape on a canvas.
+ * Draw a linear tape centred on `value`; ticks stop at the display limits.
+ * A null value leaves the tape blank.
  * @param {HTMLCanvasElement} cv
- * @param {object} opts
  */
-function drawTape(cv, { value, c, majorStep, minorStep, side = 'left', label = (v) => v }) {
+function drawTape(cv, { value, c, window: span, majorStep, minorStep, side }) {
   const dpr = window.devicePixelRatio || 1;
   // The canvas is stretched by CSS (flex: 1), so its client box is the truth.
   const w = cv.clientWidth || 120;
@@ -121,44 +202,44 @@ function drawTape(cv, { value, c, majorStep, minorStep, side = 'left', label = (
   const ctx = cv.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
+  if (value === null || !c) return;
 
   const centreY = h / 2;
-  const pxPerUnit = h / (c.max - c.min);
-  const gutter = side === 'left' ? w - 8 : 8;
+  const pxPerUnit = h / span;
+  const yOf = (v) => centreY - (v - value) * pxPerUnit;
 
   ctx.font = '10px ui-monospace, monospace';
   ctx.textBaseline = 'middle';
 
-  // Visible window in engineering units.
-  const topVal = c.max;
-  const botVal = c.min;
-  const first = Math.ceil(botVal / minorStep) * minorStep;
-  for (let v = first; v <= topVal; v += minorStep) {
-    const y = centreY - (v - value) * pxPerUnit;
-    if (y < -10 || y > h + 10) continue;
+  const lo = Math.max(c.min, value - span / 2);
+  const hi = Math.min(c.max, value + span / 2);
+  for (let v = Math.ceil(lo / minorStep) * minorStep; v <= hi; v += minorStep) {
+    const y = yOf(v);
     const isMajor = Math.abs(v / majorStep - Math.round(v / majorStep)) < 1e-6;
     ctx.strokeStyle = isMajor ? '#7d8fa1' : '#38495a';
     ctx.lineWidth = isMajor ? 1.2 : 1;
     ctx.beginPath();
     ctx.moveTo(side === 'left' ? w - (isMajor ? 22 : 12) : 0, y);
-    ctx.lineTo(w, y);
+    ctx.lineTo(side === 'left' ? w : isMajor ? 22 : 12, y);
     ctx.stroke();
 
     if (isMajor) {
       ctx.fillStyle = '#9fb2c4';
       ctx.textAlign = side === 'left' ? 'left' : 'right';
-      ctx.fillText(label(v), side === 'left' ? 2 : w - 2, y);
+      ctx.fillText(String(Math.round(v)), side === 'left' ? 2 : w - 2, y);
     }
   }
 
-  // Reference bug at the configured midpoint.
-  const bugY = centreY - ((c.min + c.max) / 2 - value) * pxPerUnit;
-  ctx.strokeStyle = '#4fc3f7';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, bugY);
-  ctx.lineTo(w, bugY);
-  ctx.stroke();
+  // Display limits: the scale ends here.
+  ctx.strokeStyle = '#f5b400';
+  ctx.lineWidth = 2;
+  for (const lim of [c.min, c.max]) {
+    if (lim < value - span / 2 || lim > value + span / 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(0, yOf(lim));
+    ctx.lineTo(w, yOf(lim));
+    ctx.stroke();
+  }
 
   // Centre pointer.
   ctx.fillStyle = '#ffcc00';
@@ -175,20 +256,19 @@ function drawTape(cv, { value, c, majorStep, minorStep, side = 'left', label = (
   ctx.closePath();
   ctx.fill();
 
-  // Smoothing lines from tick gutter to the value box.
   ctx.strokeStyle = '#2b3a49';
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, centreY);
   ctx.lineTo(w, centreY);
   ctx.stroke();
-  void gutter;
 }
 
 /* -------------------------------------------------------------- heading arc */
 
-function drawHeading() {
+/** Heading ribbon: fixed 60 deg window, ticks only between the display limits. */
+function drawHeading(heading, c) {
   const cv = $('cv-hdg');
-  if (!cv) return;
   const dpr = window.devicePixelRatio || 1;
   const w = cv.clientWidth || cv.width;
   const h = cv.clientHeight || cv.height;
@@ -199,10 +279,6 @@ function drawHeading() {
   const ctx = cv.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-
-  const p = params.get('HEADING');
-  const c = display.get('HEADING');
-  const heading = p && p.valid ? eased('HEADING') : null;
   if (heading === null || !c) return;
 
   const spanDeg = 60; // degrees visible across the arc
@@ -219,6 +295,8 @@ function drawHeading() {
 
   for (let d = -spanDeg; d <= spanDeg; d += 5) {
     const hdg = (Math.round(heading / 5) * 5 + d + 360) % 360;
+    // 000 is also 360, so a 0..360 range keeps every tick.
+    if (!((hdg >= c.min && hdg <= c.max) || (hdg === 0 && c.max >= 360))) continue;
     const x = centreX + ((hdg - heading + 540) % 360 - 180) * pxPerDeg;
     if (x < -30 || x > w + 30) continue;
     const major = hdg % 10 === 0;
@@ -250,68 +328,19 @@ function drawHeading() {
 function renderAll() {
   ADI.render();
 
-  // ---- CAS
-  const casP = params.get('CAS');
-  const casC = display.get('CAS');
-  const casTape = $('tape-cas');
-  const casOk = casP && casP.valid && casC && casC.visible;
-  casTape.classList.toggle('failed', !(casP && casP.valid));
-  casTape.classList.toggle('stale', !!(casP && casP.stale));
-  casTape.classList.toggle('hidden-param', !(casC && casC.visible));
-  $('f-cas').textContent = casP && casP.stale ? 'STALE' : casP && casP.ssm === 'NCD' ? 'NCD' : 'INOP';
-  if (casC) {
-    drawTape($('cv-cas'), {
-      value: casOk ? eased('CAS') : (casC.min + casC.max) / 2,
-      c: casC, majorStep: 20, minorStep: 10, digits: 0, side: 'left',
-    });
+  for (const [tag, t] of Object.entries(TAPES)) {
+    const v = view(tag);
+    applyState($(t.el), $(t.flag), v);
+    drawTape($(t.cv), { ...t, value: v.g, c: v.c });
+    $(t.val).textContent = v.text;
+    $(t.val).classList.toggle('over', v.over);
   }
-  $('v-cas').textContent = casOk ? fmt(casP.value, 1) : '—';
 
-  // ---- altitude
-  const altP = params.get('BARO_ALT');
-  const altC = display.get('BARO_ALT');
-  const altTape = $('tape-alt');
-  const altOk = altP && altP.valid && altC && altC.visible;
-  altTape.classList.toggle('failed', !(altP && altP.valid));
-  altTape.classList.toggle('stale', !!(altP && altP.stale));
-  altTape.classList.toggle('hidden-param', !(altC && altC.visible));
-  $('f-alt').textContent = altP && altP.stale ? 'STALE' : altP && altP.ssm === 'NCD' ? 'NCD' : 'INOP';
-  if (altC) {
-    drawTape($('cv-alt'), {
-      value: altOk ? eased('BARO_ALT') : (altC.min + altC.max) / 2,
-      c: altC, majorStep: 5000, minorStep: 1000, digits: 0, side: 'right',
-      label: (v) => (v >= 0 ? String(Math.round(v / 1000)) : String(Math.round(v))),
-    });
-  }
-  $('v-alt').textContent = altOk ? Math.round(altP.value).toLocaleString() : '—';
-
-  // ---- vertical speed
-  const vsP = params.get('VERT_SPEED');
-  const vsC = display.get('VERT_SPEED');
-  const vsTape = $('tape-vs');
-  const vsOk = vsP && vsP.valid && vsC && vsC.visible;
-  vsTape.classList.toggle('failed', !(vsP && vsP.valid));
-  vsTape.classList.toggle('stale', !!(vsP && vsP.stale));
-  vsTape.classList.toggle('hidden-param', !(vsC && vsC.visible));
-  $('f-vs').textContent = vsP && vsP.stale ? 'STALE' : vsP && vsP.ssm === 'NCD' ? 'NCD' : 'INOP';
-  if (vsC) {
-    drawTape($('cv-vs'), {
-      value: vsOk ? eased('VERT_SPEED') : (vsC.min + vsC.max) / 2,
-      c: vsC, majorStep: 500, minorStep: 250, digits: 0, side: 'left',
-      label: (v) => (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v)),
-    });
-  }
-  $('v-vs').textContent = vsOk ? Math.round(vsP.value) : '—';
-
-  // ---- heading
-  const hdgP = params.get('HEADING');
-  const hdgC = display.get('HEADING');
-  const hdgOk = hdgP && hdgP.valid && hdgC && hdgC.visible;
-  $('f-hdg').style.display = hdgP && !hdgP.valid ? 'block' : 'none';
-  $('f-hdg').textContent = hdgP && hdgP.stale ? 'STALE' : hdgP && hdgP.ssm === 'NCD' ? 'NCD' : 'INOP';
-  $('f-hdg').className = 'tape-flag';
-  drawHeading();
-  $('v-hdg').textContent = hdgOk ? String(Math.round(hdgP.value) % 360).padStart(3, '0') : '—';
+  const vh = view('HEADING');
+  applyState($('hdg-panel'), $('f-hdg'), vh);
+  drawHeading(vh.g, vh.c);
+  $('v-hdg').textContent = vh.text;
+  $('v-hdg').classList.toggle('over', vh.over);
 }
 
 /* ------------------------------------------------------------------- status */
@@ -337,13 +366,39 @@ function renderStatus() {
   $('s-words').textContent = (window.__words ?? 0).toLocaleString();
   $('s-parity').textContent = String(window.__parity ?? 0);
 
-  const annuns = [];
-  if (fresh.length === 0) annuns.push('A429 LOSS');
-  for (const p of list) {
-    if (p.stale && fresh.length > 0) annuns.push(`${p.tag.replace(/_/g, ' ')} STALE`);
-    else if (!p.valid && !p.stale) annuns.push(`${p.tag.replace(/_/g, ' ')} ${p.ssm || 'INOP'}`);
+  // Every aural alert has its text here, so sound and display always agree.
+  const warning = list.length > 0 && fresh.length === 0;
+  const callouts = [];
+  const roll = params.get('ROLL');
+  const vs = params.get('VERT_SPEED');
+  if (roll?.valid && Math.abs(roll.value) > BANK_ANGLE_DEG) callouts.push('BANK ANGLE');
+  if (vs?.valid && vs.value < SINK_RATE_FPM) callouts.push('SINK RATE');
+
+  const cautions = [];
+  if (!warning) {
+    for (const p of list) {
+      const name = p.tag.replace(/_/g, ' ');
+      if (p.stale) cautions.push(`${name} STALE`);
+      else if (!p.valid) cautions.push(`${name} ${p.ssm || 'INOP'}`);
+      else if (view(p.tag).over) cautions.push(`${name} LIMIT`);
+    }
   }
+
+  const annuns = [...(warning ? ['A429 LOSS'] : []), ...callouts, ...cautions];
   $('a-list').textContent = annuns.length ? annuns.join(' · ') : 'NONE';
+  updateAlerts({ warning, callouts, cautions });
+}
+
+/** @param {boolean} [awaitingGesture] true until the page has had a click/key */
+function renderSoundButton(awaitingGesture = false) {
+  const b = $('s-sound');
+  if (awaitingGesture) {
+    b.textContent = 'CLICK PAGE TO ARM';
+    b.className = 'badge sound inop';
+    return;
+  }
+  b.textContent = isEnabled() ? 'ON' : 'MUTED';
+  b.className = `badge sound ${isEnabled() ? 'ok' : ''}`;
 }
 
 /* ------------------------------------------------------------------ easing */
@@ -399,6 +454,26 @@ async function init() {
     for (const [tag, c] of Object.entries(config)) display.set(tag, c);
     renderAll();
   });
+
+  // Audio may only start from a user gesture. Sound is wanted on, so the first
+  // click or key anywhere on the page arms it; the button then mutes/unmutes.
+  const btn = $('s-sound');
+  const arm = (ev) => {
+    if (ev.target === btn) return; // the button's own click handler decides
+    removeEventListener('pointerdown', arm);
+    removeEventListener('keydown', arm);
+    if (!isEnabled()) setEnabled(true);
+    renderSoundButton();
+  };
+  addEventListener('pointerdown', arm);
+  addEventListener('keydown', arm);
+  btn.addEventListener('click', () => {
+    removeEventListener('pointerdown', arm);
+    removeEventListener('keydown', arm);
+    setEnabled(!isEnabled());
+    renderSoundButton();
+  });
+  renderSoundButton(true);
 
   window.addEventListener('resize', renderAll);
   requestAnimationFrame(frame);

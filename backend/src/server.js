@@ -135,7 +135,7 @@ export function startBackend({
                 }
                 broadcastConfig();
                 res.writeHead(200, { ...cors, 'content-type': MIME['.json'] });
-                res.end(JSON.stringify({ ok: true }));
+                res.end(JSON.stringify({ ok: true, label: body.label, config: result.config }));
                 return;
             }
 
@@ -205,7 +205,9 @@ export function startBackend({
             }
             const data = await readFileAsync(filePath);
             const type = MIME[extname(filePath)] ?? 'application/octet-stream';
-            res.writeHead(200, { ...cors, 'content-type': type }).end(data);
+            // no-cache: without it the browser heuristically cached the ES
+            // modules, so an edited sfd.js / alerts.js kept running the old code.
+            res.writeHead(200, { ...cors, 'content-type': type, 'cache-control': 'no-cache' }).end(data);
         } catch (err) {
             if (err.code === 'ENOENT') {
                 res.writeHead(404, { ...cors, 'content-type': 'text/plain' }).end('not found');

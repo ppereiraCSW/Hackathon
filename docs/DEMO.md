@@ -80,13 +80,28 @@ holds it where it is.
 | Left stick X | roll, up to 30°/s, held within ±45° |
 | Left stick Y | pitch, up to 10°/s, held within ±20° (stick back = nose up) |
 | Throttle / Z | calibrated airspeed, up to 25 kt/s, 0–250 kt |
-| Rudder / R | vertical speed, up to 1000 ft/min per s, ±2000 ft/min |
-| Heading, altitude | integrated in the firmware (bank → turn, V/S → altitude) |
+| Heading | integrated in the firmware from bank (coordinated turn) |
+| V/S, altitude | derived in the firmware: V/S = CAS × sin(pitch), altitude integrates V/S — so nose up climbs |
+| Rudder / R | unused |
 | A | wings level (roll and pitch to 0) |
 | B (hold 1 s) | reset heading to 0 |
 | LB / RB | CAS −10 / +10 kt |
-| D-pad up / down | altitude ±500 ft |
+| D-pad up / down | altitude ±500 ft per press, between the ground (0 ft) and 100,000 ft |
 | **START** | freeze — every label sent as **NCD** (demonstrates validity) |
+
+## Aural alerts
+
+Sound is on by default, but browsers block audio until the page gets a click or
+key press: the SOUND badge reads **CLICK PAGE TO ARM** until then, and a chime
+confirms it is armed. The badge then mutes / unmutes. Every sound has its text
+in the annunciator line, so the two always agree.
+
+| Level | Sound | When |
+|---|---|---|
+| Warning | repeating hi-lo alarm | A429 LOSS — no label fresh |
+| Callout | spoken "BANK ANGLE" | \|roll\| > 35° |
+| Callout | spoken "SINK RATE" | V/S below −3000 ft/min |
+| Caution | single chime when it appears | a parameter goes INOP / NCD / STALE, or leaves its display limits (LIMIT) |
 
 ## The demo script (about 4 minutes)
 
@@ -95,10 +110,13 @@ holds it where it is.
 2. **Fly it.** Move the stick: attitude banks, heading turns, altitude and CAS tapes
    move. Say which layer each thing came from — nothing on the SFD is computed in
    the browser.
-3. **Move a slider.** On `/config`, narrow PITCH's display range. The SFD attitude
-   scale changes while the *value* stays the same — this is the "one slider per
-   parameter, configuring the display" requirement, and it shows values cannot be
-   faked with a slider.
+3. **Move a slider.** On `/config`, narrow PITCH's display range to ±10°. The SFD
+   pitch ladder now ends at ±10°; pitch beyond it pins the horizon at the limit and
+   turns the readout amber, while the *value* stays the same — this is the "one
+   slider per parameter, configuring the display" requirement, and it shows values
+   cannot be faked with a slider. Every instrument follows the same rules: min/max
+   are where its scale ends, "show on SFD" off blanks and dims it, and invalid data
+   blanks it behind an INOP / NCD / STALE flag.
 4. **Press START.** Every instrument annunciates NCD and the A429 badge degrades.
    Press again to recover. That is SSM handling proven live.
 5. **Unplug / stop the pad** (`Ctrl+C` on the pad reader, or stop the injector).
@@ -108,13 +126,14 @@ holds it where it is.
    `node tools/run-all.mjs --replay` — **no QEMU, no gamepad, no serial port** — and
    the SFD flies again from the recorded capture. This is the requirement that the
    A429 processing is decoupled from the embedded layer.
-7. **Show the tests.** `npm test` → 38 passing, including the two decoupled tests.
+7. **Show the tests.** `npm test` → 64 passing, including the two decoupled tests.
 
 ## Verify claims yourself
 
 ```bash
-npm test                              # 38 tests
-node tools/test-pad-path.mjs          # 12 checks: pad frame -> firmware -> A429 -> backend
+npm test                              # 64 tests, incl. boundary values per label
+node tools/test-pad-path.mjs          # 21 checks: pad frame -> firmware -> A429 -> backend
+node tools/test-boundaries.mjs        # 41 checks: every parameter driven into both limits in QEMU
 node tools/verify-pad-live.mjs        # the REAL pad through the real pipeline
 node tools/probe-rate.mjs 5           # measured frame rate, expect ~50 Hz
 node tools/gen-vectors.mjs            # regenerates the golden vectors (must not change)

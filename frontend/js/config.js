@@ -1,5 +1,7 @@
 /* Backend configuration page: one slider per received parameter. */
 
+import { formatValue, unitText } from './format.js';
+
 const $ = (id) => document.getElementById(id);
 
 /** label -> DOM refs */
@@ -7,10 +9,9 @@ const rows = new Map();
 /** label -> derived step (width / 200) */
 const steps = new Map();
 
-function fmt(v, unit) {
-  if (v === null || v === undefined) return '—';
-  const digits = Math.abs(v) >= 1000 ? 0 : Math.abs(v) >= 10 ? 1 : 2;
-  return `${v.toFixed(digits)} ${unit}`;
+/** Same format as the SFD readout, plus the unit. */
+function fmt(tag, v, unit) {
+  return `${formatValue(tag, v)}${unitText(unit)}`;
 }
 
 function makeRow(p) {
@@ -97,33 +98,39 @@ function makeRow(p) {
     }
     el.classList.remove('rejected');
     el.title = '';
+    p.config = body.config;
     return true;
   }
+
+  /** Put the controls back on the last committed config. */
+  const revert = () => {
+    minInput.value = String(p.config.min);
+    maxInput.value = String(p.config.max);
+    visInput.checked = p.config.visible;
+    render();
+  };
 
   // Live drag updates the label, commit on release keeps the bus quiet.
   minInput.addEventListener('input', render);
   maxInput.addEventListener('input', render);
   minInput.addEventListener('change', async () => {
-    const ok = await commit({ min: Number(minInput.value) });
-    if (!ok) minInput.value = String(p.config.min);
+    if (!(await commit({ min: Number(minInput.value) }))) revert();
   });
   maxInput.addEventListener('change', async () => {
-    const ok = await commit({ max: Number(maxInput.value) });
-    if (!ok) maxInput.value = String(p.config.max);
+    if (!(await commit({ max: Number(maxInput.value) }))) revert();
   });
   visInput.addEventListener('change', async () => {
-    const ok = await commit({ visible: visInput.checked });
-    if (!ok) visInput.checked = p.config.visible;
+    if (!(await commit({ visible: visInput.checked }))) revert();
   });
   reset.addEventListener('click', async () => {
-    await fetch('/api/config/reset', {
+    const res = await fetch('/api/config/reset', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ label: p.label }),
     });
-    minInput.value = String(p.hardRange.min);
-    maxInput.value = String(p.hardRange.max);
-    render();
+    const body = await res.json();
+    if (body.ok) p.config = body.config;
+    revert();
   });
 
   rows.set(p.label, { el, live, minInput, maxInput, visInput, def: p, render });
@@ -149,7 +156,7 @@ async function init() {
       row.live.textContent = p.stale
         ? 'STALE'
         : p.valid
-          ? fmt(p.value, row.def.unit)
+          ? fmt(p.tag, p.value, row.def.unit)
           : (p.ssm === 'NCD' ? 'NCD' : 'INOP');
       row.live.className = `param-live ${p.stale ? 'stale' : p.valid ? 'ok' : 'inop'}`;
     }
@@ -177,6 +184,7 @@ async function init() {
     for (const [tag, c] of Object.entries(config)) {
       const row = rows.get(c.label);
       if (!row) continue;
+      row.def.config = { min: c.min, max: c.max, visible: c.visible };
       if (document.activeElement !== row.minInput) row.minInput.value = String(c.min);
       if (document.activeElement !== row.maxInput) row.maxInput.value = String(c.max);
       row.visInput.checked = c.visible;

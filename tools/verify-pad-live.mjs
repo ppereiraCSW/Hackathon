@@ -194,7 +194,7 @@ for (;;) {
     if (roll !== null && Math.abs(roll) > 1) moved.add('X → ROLL');
     if (pitch !== null && Math.abs(pitch) > 1) moved.add('Y → PITCH');
     if (cas !== null && Math.abs(cas - 125) > 3) moved.add('Z → CAS');
-    if (vs !== null && Math.abs(vs) > 30) moved.add('R → VERT SPEED');
+    // V/S is derived from pitch and CAS in the firmware; R drives nothing.
 
     // Detect NCD as a direct signal of the START button.
     for (const p of snap.params) {
@@ -214,11 +214,11 @@ for (;;) {
     console.log(row('X  roll', 'deg', roll, toRaw(roll, 45), 45));
     console.log(row('Y  pitch', 'deg', pitch, toRaw(pitch, 20), 20));
     console.log(row('Z  CAS', 'kt', cas, toRaw(cas, 250), 250));
-    console.log(row('R  V/S', 'fpm', vs, toRaw(vs, 2000), 2000));
     console.log('');
     const hdg = byTag.HEADING?.value;
     const alt = byTag.BARO_ALT?.value;
     console.log(`  derived   heading ${hdg !== undefined && hdg !== null ? hdg.toFixed(1).padStart(6) : '     —'} deg      ` +
+        `V/S ${vs !== null ? Math.round(vs).toString().padStart(6) : '     —'} fpm      ` +
         `altitude ${alt !== undefined && alt !== null ? Math.round(alt).toLocaleString().padStart(7) : '      —'} ft`);
     console.log('');
     const bad = snap.params.filter((p) => p.ssm === 'NCD').map((p) => p.tag);

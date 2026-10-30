@@ -35,7 +35,9 @@
   gap: 12px;
   min-height: 0;
   padding: 14px;
+  position: relative;
 }
+.adi-panel .tape-flag { inset: 44% 30% auto 30%; }
 #adi {
   width: auto;
   height: 100%;
@@ -115,10 +117,15 @@
   border-radius: 3px;
   padding: 2px 0;
 }
-.tape.failed .tape-flag { display: block; }
-.tape.failed .tape-value { color: var(--warn); }
-.tape.stale .tape-flag { display: block; background: var(--bad); color: #0b0f14; }
-.tape.hidden-param { opacity: 0.28; }
+/* One set of state rules for every instrument (tapes, ADI, heading):
+ *   failed  -> graphic blanked, readout '—', flag (INOP / NCD)
+ *   stale   -> same, red flag
+ *   hidden  -> graphic blanked, readout '—', instrument dimmed
+ *   over    -> value beyond the display limits: graphic pinned, readout amber */
+.failed > .tape-flag { display: block; }
+.stale > .tape-flag { display: block; background: var(--bad); color: #0b0f14; }
+.hidden-param { opacity: 0.28; }
+.over { color: var(--warn) !important; }
 
 /* --------------------------------------------------------------- heading */
 .hdg-panel {
@@ -196,6 +203,7 @@
   color: var(--ink);
 }
 .badge.ok { background: var(--ok); color: #06210f; }
+.badge.sound { border: 0; cursor: pointer; font-family: inherit; }
 .badge.inop { background: var(--warn); color: #241a00; }
 .badge.stale { background: var(--bad); color: #2a0505; }
 

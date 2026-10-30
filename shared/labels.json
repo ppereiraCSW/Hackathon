@@ -61,7 +61,7 @@
       "lsbNote": "1 ft/min per bit",
       "min": -32000,
       "max": 32000,
-      "display": { "min": -2000, "max": 2000, "visible": true }
+      "display": { "min": -6000, "max": 6000, "visible": true }
     }
   ]
 }
