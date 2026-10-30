@@ -125,7 +125,7 @@ public static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr s, ref SP_DEVIC
 [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 public static extern IntPtr CreateFile(string n, uint a, uint sh, IntPtr sec, uint d, uint f, IntPtr t);
 [DllImport("kernel32.dll", SetLastError = true)]
-public static extern bool ReadFile(IntPtr h, byte[] b, int n, out int read, IntPtr ov);
+public static extern bool ReadFile(IntPtr h, IntPtr b, int n, out int read, IntPtr ov);
 [DllImport("kernel32.dll", SetLastError = true)]
 public static extern bool GetOverlappedResult(IntPtr h, IntPtr ov, out int transferred, bool wait);
 [DllImport("kernel32.dll", SetLastError = true)]
@@ -161,7 +161,10 @@ public class Device {
     /** Unmanaged OVERLAPPED block (event handle + offsets), zeroed. */
     public IntPtr OverlappedMem = IntPtr.Zero;
     public IntPtr Event = IntPtr.Zero;
-    public byte[] PendingBuf;
+    /** Unmanaged read buffer. An overlapped ReadFile completes after the call
+     *  returns, so the target must not be a managed array the GC can move. */
+    public IntPtr ReadMem = IntPtr.Zero;
+    public int ReadLen;
     public byte[] LastBuf;
     public int LastLen;
     public bool ReadPending;
@@ -236,15 +239,23 @@ public static bool Open(Device dev, out string err) {
     for (int i = 0; i < 64; i++) Marshal.WriteByte(dev.OverlappedMem, i, 0);
     dev.Event = CreateEvent(IntPtr.Zero, false, false, null);
     Marshal.WriteIntPtr(dev.OverlappedMem, IntPtr.Size == 8 ? 24 : 16, dev.Event);
+    dev.ReadLen = Math.Max(dev.InputReportLen, 8);
+    dev.ReadMem = Marshal.AllocHGlobal(dev.ReadLen);
     dev.ReadPending = false;
     return true;
 }
 
 public static void Close(Device dev) {
     if (dev.ReadPending) {
-        try { CancelIoEx(dev.Handle, IntPtr.Zero); } catch { }
+        try {
+            CancelIoEx(dev.Handle, IntPtr.Zero);
+            // Wait for the cancelled read to finish before its buffer is freed.
+            int ignored;
+            GetOverlappedResult(dev.Handle, dev.OverlappedMem, out ignored, true);
+        } catch { }
         dev.ReadPending = false;
     }
+    if (dev.ReadMem != IntPtr.Zero) { Marshal.FreeHGlobal(dev.ReadMem); dev.ReadMem = IntPtr.Zero; }
     if (dev.PreParsed != IntPtr.Zero) { HidD_FreePreparsedData(dev.PreParsed); dev.PreParsed = IntPtr.Zero; }
     if (dev.Handle != INVALID) { CloseHandle(dev.Handle); dev.Handle = INVALID; }
     if (dev.Event != IntPtr.Zero) { CloseHandle(dev.Event); dev.Event = IntPtr.Zero; }
@@ -268,36 +279,54 @@ public static byte[] PollReport(Device dev) {
         int got = 0;
         bool ok = GetOverlappedResult(dev.Handle, dev.OverlappedMem, out got, false);
         dev.ReadPending = false;
-        if (!ok || got <= 0) { dev.PendingBuf = null; return null; }
-        dev.LastBuf = dev.PendingBuf;
-        dev.LastLen = got;
-        var done = dev.PendingBuf;
-        dev.PendingBuf = null;
-        return done;
+        if (!ok || got <= 0) return null;
+        return TakeReport(dev, got);
     }
 
-    int len = Math.Max(dev.InputReportLen, 8);
-    var buf = new byte[len];
-    dev.PendingBuf = buf;
     int read = 0;
-    bool r = ReadFile(dev.Handle, buf, len, out read, dev.OverlappedMem);
+    bool r = ReadFile(dev.Handle, dev.ReadMem, dev.ReadLen, out read, dev.OverlappedMem);
     if (!r) {
         int e = Marshal.GetLastWin32Error();
-        if (e == ERROR_IO_PENDING) { dev.ReadPending = true; return null; }
-        dev.PendingBuf = null;
+        if (e == ERROR_IO_PENDING) dev.ReadPending = true;
         return null;
     }
-    dev.PendingBuf = null;
     if (read <= 0) return null;
+    return TakeReport(dev, read);
+}
+
+static byte[] TakeReport(Device dev, int got) {
+    // HidP_* expects the full report length, so copy into a buffer of ReadLen.
+    var buf = new byte[dev.ReadLen];
+    Marshal.Copy(dev.ReadMem, buf, 0, Math.Min(got, dev.ReadLen));
     dev.LastBuf = buf;
-    dev.LastLen = read;
+    dev.LastLen = got;
     return buf;
+}
+
+/**
+ * Drains every report Windows has queued and returns the newest, or null if
+ * none arrived since the last call.
+ *
+ * The pad sends ~200 reports/s but the loop ticks at 50 Hz. Taking one report
+ * per tick lets the HID input queue (32 deep by default) fill up, so every
+ * frame carried a value ~0.6 s old and the driver's overflow drops made the
+ * motion jerky. Only the latest state matters, so read until the queue is empty.
+ */
+public static byte[] PollLatest(Device dev) {
+    byte[] latest = null;
+    for (int i = 0; i < 256; i++) {
+        var b = PollReport(dev);
+        if (b == null) break;
+        latest = b;
+    }
+    return latest;
 }
 
 /** Value in the report for a usage on the Generic Desktop page (1). */
 public static uint GetValue(Device dev, ushort usage, byte[] report, int len) {
     uint v = 0;
-    int st = HidP_GetUsageValue(1, 1, 0, usage, out v, dev.PreParsed, report, len);
+    // Report type 0 = HidP_Input (1 is Output, 2 is Feature).
+    int st = HidP_GetUsageValue(0, 1, 0, usage, out v, dev.PreParsed, report, len);
     return st == 0x00110000 ? v : uint.MaxValue;
 }
 
@@ -305,7 +334,7 @@ public static uint GetValue(Device dev, ushort usage, byte[] report, int len) {
 public static uint GetButtons(Device dev, byte[] report, int len) {
     var list = new ushort[64];
     uint n = 64;
-    int st = HidP_GetUsages(1, 9, 0, list, ref n, dev.PreParsed, report, len);
+    int st = HidP_GetUsages(0, 9, 0, list, ref n, dev.PreParsed, report, len);
     if (st != 0x00110000) return 0;
     uint bits = 0;
     for (uint i = 0; i < n; i++) {
@@ -435,7 +464,7 @@ function Read-Pad {
     }
 
     # --- HID: non-blocking poll for the newest input report
-    $buf = [PadHid.Native]::PollReport($ctx.Device)
+    $buf = [PadHid.Native]::PollLatest($ctx.Device)
     if ($null -eq $buf) {
         # No new report this tick. HID is state-based, so repeating the last
         # report is correct: the sticks have not moved.
@@ -496,11 +525,24 @@ $client = $listener.AcceptTcpClient()
 $client.NoDelay = $true
 $stream = $client.GetStream()
 $period = [int](1000.0 / $RateHz)
+
+# The default Windows timer ticks every ~15.6 ms, so Start-Sleep 20 really
+# sleeps ~31 ms and the loop ran at ~32 Hz instead of 50. 1 ms resolution for
+# this process fixes the cadence; Windows restores it when the process exits.
+if (-not ('PadTimer.Native' -as [type])) {
+    Add-Type -Namespace PadTimer -Name Native -MemberDefinition @'
+[DllImport("winmm.dll")] public static extern uint timeBeginPeriod(uint ms);
+[DllImport("winmm.dll")] public static extern uint timeEndPeriod(uint ms);
+'@
+}
+[void][PadTimer.Native]::timeBeginPeriod(1)
+
 $seq = 0
 $sent = 0
 $last = @{ X = 32767; Y = 32767; Z = 32767; R = 32767; Buttons = 0; Pov = -1 }
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $deadline = if ($Seconds -gt 0) { $Seconds * 1000 } else { [long]::MaxValue }
+$nextTick = $sw.ElapsedMilliseconds
 
 # If the guest (QEMU) goes away, do not die: drop the connection and wait for a
 # new one. A crashed guest should not force a restart of the whole stack, and a
@@ -512,8 +554,6 @@ while ($sw.ElapsedMilliseconds -lt $deadline) {
 
     try {
         while ($sw.ElapsedMilliseconds -lt $deadline) {
-            $t0 = $sw.ElapsedMilliseconds
-
             $s = Read-Pad -ctx $ctx
             if ($null -ne $s) {
                 if ($s.Ok) { $last = $s }
@@ -544,7 +584,13 @@ while ($sw.ElapsedMilliseconds -lt $deadline) {
             }
 
             $seq++
-            $sleep = $period - ($sw.ElapsedMilliseconds - $t0)
+            # Schedule against absolute targets, not "period minus this pass":
+            # when the OS oversleeps, the next wait is shorter, so the average
+            # rate stays at $RateHz instead of drifting down to ~32 Hz.
+            $nextTick += $period
+            $now = $sw.ElapsedMilliseconds
+            if ($nextTick -lt $now - $period) { $nextTick = $now }  # after a stall, do not burst
+            $sleep = $nextTick - $now
             if ($sleep -gt 0) { Start-Sleep -Milliseconds $sleep }
         }
     } catch [System.IO.IOException] {
@@ -562,5 +608,6 @@ while ($sw.ElapsedMilliseconds -lt $deadline) {
 }
 
 Write-Host "[pad] stopping after $sent frames" -ForegroundColor Yellow
+[void][PadTimer.Native]::timeEndPeriod(1)
 if ($ctx.Kind -eq 'hid') { [PadHid.Native]::Close($ctx.Device) }
 $listener.Stop()

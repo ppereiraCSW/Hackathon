@@ -31,7 +31,9 @@ const MIME = {
     '.svg': 'image/svg+xml',
 };
 
-const SSE_HZ = 20;
+// Matches the firmware's 50 Hz frame rate. Node timers on Windows have ~15.6 ms
+// resolution, so the delivered rate is ~32 Hz there; the SFD eases between frames.
+const SSE_HZ = 50;
 
 /** @returns {{state:ParamState, config:DisplayConfig, close:()=>void, server:object}} */
 export function startBackend({

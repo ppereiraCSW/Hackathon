@@ -2,11 +2,13 @@
  * Secondary Flight Display.
  *
  * Consumes two SSE streams from the backend:
- *   /events          engineering values + validity (20 Hz)
+ *   /events          engineering values + validity (50 Hz)
  *   /config-events   display configuration from the sliders (on change)
  *
  * The display never computes a flight quantity: every number shown is either a
  * value the backend decoded from ARINC 429 or the user's display configuration.
+ * Only the graphics (horizon, tapes, heading arc) are eased between updates so
+ * motion is smooth; the numeric readouts always show the decoded value.
  */
 
 const $ = (id) => document.getElementById(id);
@@ -15,6 +17,17 @@ const $ = (id) => document.getElementById(id);
 const params = new Map();
 /** Latest display config, keyed by tag. */
 const display = new Map();
+/** Value the graphics currently show per tag, eased toward params each frame. */
+const shown = new Map();
+/** Easing time constant: short enough to feel direct, long enough to hide steps. */
+const SMOOTH_TAU_MS = 60;
+
+/** Eased value for drawing; falls back to the decoded value. */
+function eased(tag) {
+  const p = params.get(tag);
+  if (!p) return null;
+  return shown.has(tag) ? shown.get(tag) : p.value;
+}
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -73,8 +86,8 @@ const ADI = {
     ADI.buildLadder();
     const p = params.get('PITCH');
     const r = params.get('ROLL');
-    const pitch = p && p.valid ? p.value : 0;
-    const roll = r && r.valid ? r.value : 0;
+    const pitch = p && p.valid ? eased('PITCH') : 0;
+    const roll = r && r.valid ? eased('ROLL') : 0;
 
     const world = $('adi-world');
     if (world) {
@@ -84,8 +97,8 @@ const ADI = {
         `rotate(${-roll.toFixed(2)} 160 160) translate(0 ${(pitch * ADI.pxPerDeg).toFixed(2)})`,
       );
     }
-    $('r-pitch').innerHTML = `PITCH <b>${p && p.valid ? pitch.toFixed(1) + '°' : '—'}</b>`;
-    $('r-roll').innerHTML = `ROLL <b>${r && r.valid ? roll.toFixed(1) + '°' : '—'}</b>`;
+    $('r-pitch').innerHTML = `PITCH <b>${p && p.valid ? p.value.toFixed(1) + '°' : '—'}</b>`;
+    $('r-roll').innerHTML = `ROLL <b>${r && r.valid ? r.value.toFixed(1) + '°' : '—'}</b>`;
   },
 };
 
@@ -189,7 +202,7 @@ function drawHeading() {
 
   const p = params.get('HEADING');
   const c = display.get('HEADING');
-  const heading = p && p.valid ? p.value : null;
+  const heading = p && p.valid ? eased('HEADING') : null;
   if (heading === null || !c) return;
 
   const spanDeg = 60; // degrees visible across the arc
@@ -248,7 +261,7 @@ function renderAll() {
   $('f-cas').textContent = casP && casP.stale ? 'STALE' : casP && casP.ssm === 'NCD' ? 'NCD' : 'INOP';
   if (casC) {
     drawTape($('cv-cas'), {
-      value: casOk ? casP.value : (casC.min + casC.max) / 2,
+      value: casOk ? eased('CAS') : (casC.min + casC.max) / 2,
       c: casC, majorStep: 20, minorStep: 10, digits: 0, side: 'left',
     });
   }
@@ -265,7 +278,7 @@ function renderAll() {
   $('f-alt').textContent = altP && altP.stale ? 'STALE' : altP && altP.ssm === 'NCD' ? 'NCD' : 'INOP';
   if (altC) {
     drawTape($('cv-alt'), {
-      value: altOk ? altP.value : (altC.min + altC.max) / 2,
+      value: altOk ? eased('BARO_ALT') : (altC.min + altC.max) / 2,
       c: altC, majorStep: 5000, minorStep: 1000, digits: 0, side: 'right',
       label: (v) => (v >= 0 ? String(Math.round(v / 1000)) : String(Math.round(v))),
     });
@@ -283,7 +296,7 @@ function renderAll() {
   $('f-vs').textContent = vsP && vsP.stale ? 'STALE' : vsP && vsP.ssm === 'NCD' ? 'NCD' : 'INOP';
   if (vsC) {
     drawTape($('cv-vs'), {
-      value: vsOk ? vsP.value : (vsC.min + vsC.max) / 2,
+      value: vsOk ? eased('VERT_SPEED') : (vsC.min + vsC.max) / 2,
       c: vsC, majorStep: 500, minorStep: 250, digits: 0, side: 'left',
       label: (v) => (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v)),
     });
@@ -333,6 +346,34 @@ function renderStatus() {
   $('a-list').textContent = annuns.length ? annuns.join(' · ') : 'NONE';
 }
 
+/* ------------------------------------------------------------------ easing */
+
+let lastFrame = 0;
+
+/** Ease every shown value toward its latest decoded value, once per frame. */
+function frame(now) {
+  const dt = lastFrame ? Math.min(now - lastFrame, 200) : 0;
+  lastFrame = now;
+  const k = 1 - Math.exp(-dt / SMOOTH_TAU_MS);
+  let moving = false;
+  for (const [tag, p] of params) {
+    if (!p.valid || typeof p.value !== 'number') {
+      shown.delete(tag);
+      continue;
+    }
+    const cur = shown.has(tag) ? shown.get(tag) : p.value;
+    // Heading wraps: ease the short way round 360/0.
+    let delta = p.value - cur;
+    if (tag === 'HEADING') delta = ((delta % 360) + 540) % 360 - 180;
+    let next = Math.abs(delta) < 1e-3 ? p.value : cur + delta * k;
+    if (tag === 'HEADING') next = (next + 360) % 360;
+    if (next !== cur) moving = true;
+    shown.set(tag, next);
+  }
+  if (moving) renderAll();
+  requestAnimationFrame(frame);
+}
+
 /* --------------------------------------------------------------------- wire */
 
 async function init() {
@@ -360,6 +401,7 @@ async function init() {
   });
 
   window.addEventListener('resize', renderAll);
+  requestAnimationFrame(frame);
 }
 
 init().catch((e) => {

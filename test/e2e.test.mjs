@@ -157,7 +157,7 @@ test('live: SSE pushes state frames and a config change reaches the SFD stream',
         await new Promise((r) => sock.on('connect', r));
         sock.write(capture.subarray(0, 600));
 
-        // Two state frames is enough to prove the 20 Hz push works.
+        // Two state frames is enough to prove the 50 Hz push works.
         const states = await collectSse(`http://127.0.0.1:${ports.httpPort}/events`, 'state', 2);
         assert.equal(states.length, 2);
         assert.equal(states[0].params.length, 6);

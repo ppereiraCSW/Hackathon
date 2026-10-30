@@ -139,7 +139,7 @@ All little-endian, 50 Hz, XOR checksum over every preceding byte.
 
 ### 5.5 Backend → browsers
 
-SSE; `event: state` at 20 Hz carrying engineering values + validity, `event: config`
+SSE; `event: state` at 50 Hz carrying engineering values + validity, `event: config`
 whenever a slider changes.
 
 ## 6. Repository layout
