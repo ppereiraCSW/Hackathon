@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1050" width="1200" height="1050" font-family="Segoe UI, Helvetica, Arial, sans-serif">
   <title>AI framework: agents, rules, skills, run chain and gates</title>
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -24,7 +24,7 @@
     </style>
   </defs>
 
-  <rect width="1200" height="900" fill="#ffffff"/>
+  <rect width="1200" height="1050" fill="#ffffff"/>
 
   <text x="30" y="44" class="h1">AI framework: how work flows from a request to a verified commit</text>
   <text x="30" y="68" class="t">Tool-neutral Markdown in <tspan class="m">ai/</tspan>. Agents are generic roles; rules hold every project fact; skills are procedures; scripts keep all three honest.</text>
@@ -78,112 +78,143 @@
   <text x="596" y="176" class="t">lands all layers together or none. Recorded decisions go back to you.</text>
   <path d="M530,120 L578,120" class="flow"/>
 
-  <!-- run chain strip -->
-  <text x="330" y="218" class="h3">Run chain</text>
-  <text x="410" y="218" class="m">node tools/chain.mjs</text>
-  <text x="566" y="218" class="s">runs each stage's checks, stops at the first failure and prints the brief for its owner</text>
-  <g transform="translate(330,238)">
-    <rect x="0" y="0" width="80" height="50" rx="8" class="int" stroke-width="1.5"/>
-    <text x="9" y="20" class="h3">M0</text><text x="9" y="38" class="s">toolchain</text>
-    <rect x="85" y="0" width="80" height="50" rx="8" class="bck" stroke-width="1.5"/>
-    <text x="94" y="20" class="h3">M1</text><text x="94" y="38" class="s">A429 codec</text>
-    <rect x="170" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
-    <text x="179" y="20" class="h3">M2</text><text x="179" y="38" class="s">firmware</text>
-    <rect x="255" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
-    <text x="264" y="20" class="h3">M3</text><text x="264" y="38" class="s">real pad (hw)</text>
-    <rect x="340" y="0" width="80" height="50" rx="8" class="bck" stroke-width="1.5"/>
-    <text x="349" y="20" class="h3">M4</text><text x="349" y="38" class="s">backend</text>
-    <rect x="425" y="0" width="80" height="50" rx="8" class="frt" stroke-width="1.5"/>
-    <text x="434" y="20" class="h3">M5</text><text x="434" y="38" class="s">SFD + config</text>
-    <rect x="510" y="0" width="80" height="50" rx="8" class="int" stroke-width="1.5"/>
-    <text x="519" y="20" class="h3">M6</text><text x="519" y="38" class="s">e2e + replay</text>
-    <rect x="595" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
-    <text x="604" y="20" class="h3">M7</text><text x="604" y="38" class="s">50 Hz</text>
-    <rect x="680" y="0" width="80" height="50" rx="8" class="int" stroke-width="1.5"/>
-    <text x="689" y="20" class="h3">M8</text><text x="689" y="38" class="s">framework</text>
-    <rect x="765" y="0" width="80" height="50" rx="8" class="emb" stroke-width="1.5"/>
-    <text x="774" y="20" class="h3">M9</text><text x="774" y="38" class="s">keyboard</text>
-  </g>
-  <text x="330" y="306" class="s">Status per stage: DONE · MANUAL (a person confirms by eye) · FAIL · SKIP (waits, or no toolchain / no pad). Colour = owning agent.</text>
+  <!-- run chain -->
+  <text x="330" y="220" class="h3">Run chain: the project checklist, checked in order</text>
+  <text x="330" y="240" class="s"><tspan class="m">node tools/chain.mjs</tspan>  checks every stage below. The first stage that fails becomes a task for its owner.</text>
+  <text x="330" y="261" class="s">Box colour = owner:</text>
+  <rect x="444" y="251" width="12" height="12" rx="3" class="int" stroke-width="1.5"/><text x="461" y="261" class="s">Integrator</text>
+  <rect x="553" y="251" width="12" height="12" rx="3" class="emb" stroke-width="1.5"/><text x="570" y="261" class="s">Embedded</text>
+  <rect x="648" y="251" width="12" height="12" rx="3" class="bck" stroke-width="1.5"/><text x="665" y="261" class="s">Backend</text>
+  <rect x="736" y="251" width="12" height="12" rx="3" class="frt" stroke-width="1.5"/><text x="753" y="261" class="s">Frontend</text>
+  <rect x="330" y="272" width="162" height="88" rx="8" class="int" stroke-width="1.5"/>
+  <text x="340" y="291" class="h3">M0  Toolchain</text>
+  <text x="340" y="309" class="s">ARM compiler and QEMU</text>
+  <text x="340" y="323" class="s">are installed</text>
+  <text x="340" y="351" class="s" style="fill:#64748b">check: both are found</text>
+  <rect x="502" y="272" width="162" height="88" rx="8" class="bck" stroke-width="1.5"/>
+  <text x="512" y="291" class="h3">M1  Data encoding</text>
+  <text x="512" y="309" class="s">ARINC 429 words are</text>
+  <text x="512" y="323" class="s">bit-exact</text>
+  <text x="512" y="351" class="s" style="fill:#64748b">check: a429 unit tests</text>
+  <rect x="674" y="272" width="162" height="88" rx="8" class="emb" stroke-width="1.5"/>
+  <text x="684" y="291" class="h3">M2  Firmware</text>
+  <text x="684" y="309" class="s">builds with no warnings,</text>
+  <text x="684" y="323" class="s">sends the right words</text>
+  <text x="684" y="351" class="s" style="fill:#64748b">check: test-pad-path (17)</text>
+  <rect x="846" y="272" width="162" height="88" rx="8" class="emb" stroke-width="1.5"/>
+  <text x="856" y="291" class="h3">M3  Real gamepad</text>
+  <text x="856" y="309" class="s">sticks and buttons move</text>
+  <text x="856" y="323" class="s">the display</text>
+  <text x="856" y="351" class="s" style="fill:#64748b">check: by hand, with pad</text>
+  <rect x="1018" y="272" width="162" height="88" rx="8" class="bck" stroke-width="1.5"/>
+  <text x="1028" y="291" class="h3">M4  Backend</text>
+  <text x="1028" y="309" class="s">decodes, converts units,</text>
+  <text x="1028" y="323" class="s">flags stale data</text>
+  <text x="1028" y="351" class="s" style="fill:#64748b">check: state unit tests</text>
+  <rect x="330" y="370" width="162" height="88" rx="8" class="frt" stroke-width="1.5"/>
+  <text x="340" y="389" class="h3">M5  Display pages</text>
+  <text x="340" y="407" class="s">flight display and</text>
+  <text x="340" y="421" class="s">sliders are served</text>
+  <text x="340" y="449" class="s" style="fill:#64748b">check: e2e test + a look</text>
+  <rect x="502" y="370" width="162" height="88" rx="8" class="int" stroke-width="1.5"/>
+  <text x="512" y="389" class="h3">M6  End to end</text>
+  <text x="512" y="407" class="s">live data reaches the</text>
+  <text x="512" y="421" class="s">browser; replay works</text>
+  <text x="512" y="449" class="s" style="fill:#64748b">check: e2e tests, npm test</text>
+  <rect x="674" y="370" width="162" height="88" rx="8" class="emb" stroke-width="1.5"/>
+  <text x="684" y="389" class="h3">M7  50 Hz</text>
+  <text x="684" y="407" class="s">real data rate is</text>
+  <text x="684" y="421" class="s">measured, not assumed</text>
+  <text x="684" y="449" class="s" style="fill:#64748b">check: probe-rate</text>
+  <rect x="846" y="370" width="162" height="88" rx="8" class="int" stroke-width="1.5"/>
+  <text x="856" y="389" class="h3">M8  AI framework</text>
+  <text x="856" y="407" class="s">rules match the code,</text>
+  <text x="856" y="421" class="s">every file has an owner</text>
+  <text x="856" y="449" class="s" style="fill:#64748b">check: check-ai</text>
+  <rect x="1018" y="370" width="162" height="88" rx="8" class="emb" stroke-width="1.5"/>
+  <text x="1028" y="389" class="h3">M9  Keyboard</text>
+  <text x="1028" y="407" class="s">the keyboard flies</text>
+  <text x="1028" y="421" class="s">the aircraft</text>
+  <text x="1028" y="449" class="s" style="fill:#64748b">check: test-keyboard-path</text>
+  <text x="330" y="478" class="s"><tspan font-weight="700">DONE</tspan> checks pass   ·   <tspan font-weight="700">MANUAL</tspan> checks pass, a person must also look   ·   <tspan font-weight="700">FAIL</tspan> its owner gets the task   ·   <tspan font-weight="700">SKIP</tspan> waits for an earlier stage, or needs hardware</text>
 
-  <!-- layer agents -->
-  <path d="M1130,192 L1130,236" class="flow"/>
-  <path d="M540,314 C 540,342 465,340 465,368" class="flow"/>
-  <path d="M710,314 C 710,342 755,340 755,368" class="flow"/>
-  <path d="M795,314 C 795,342 1045,340 1045,368" class="flow"/>
-  <text x="580" y="336" class="s">brief per stage:</text>
-  <text x="580" y="352" class="s">goal · paths · rules · checks</text>
+  <!-- integrator -> chain -> agents -->
+  <path d="M1130,192 L1130,246" class="flow"/>
+  <path d="M465,486 L465,518" class="flow"/>
+  <path d="M755,486 L755,518" class="flow"/>
+  <path d="M1045,486 L1045,518" class="flow"/>
+  <text x="478" y="508" class="s">a failing stage becomes a task for its owner</text>
 
-  <rect x="330" y="370" width="270" height="150" class="box emb"/>
-  <text x="346" y="396" class="h2">Embedded agent</text>
-  <text x="346" y="416" class="m">firmware/  host/</text>
-  <text x="346" y="438" class="s">rules: common + embedded</text>
-  <text x="346" y="456" class="s">bare metal, zero warnings, timing</text>
-  <text x="346" y="472" class="s">measured, byte-exact contracts</text>
-  <text x="346" y="500" class="s">done: chain M2, M3, M7, M9</text>
+  <rect x="330" y="520" width="270" height="150" class="box emb"/>
+  <text x="346" y="546" class="h2">Embedded agent</text>
+  <text x="346" y="566" class="m">firmware/  host/</text>
+  <text x="346" y="588" class="s">rules: common + embedded</text>
+  <text x="346" y="606" class="s">bare metal, zero warnings, timing</text>
+  <text x="346" y="622" class="s">measured, byte-exact contracts</text>
+  <text x="346" y="650" class="s">done: chain M2, M3, M7, M9</text>
 
-  <rect x="620" y="370" width="270" height="150" class="box bck"/>
-  <text x="636" y="396" class="h2">Backend agent</text>
-  <text x="636" y="416" class="m">backend/  2 unit-test files</text>
-  <text x="636" y="438" class="s">rules: common + backend</text>
-  <text x="636" y="456" class="s">decode + units + validity only;</text>
-  <text x="636" y="472" class="s">never throws on wire input</text>
-  <text x="636" y="500" class="s">done: chain M1, M4, M6</text>
+  <rect x="620" y="520" width="270" height="150" class="box bck"/>
+  <text x="636" y="546" class="h2">Backend agent</text>
+  <text x="636" y="566" class="m">backend/  2 unit-test files</text>
+  <text x="636" y="588" class="s">rules: common + backend</text>
+  <text x="636" y="606" class="s">decode + units + validity only;</text>
+  <text x="636" y="622" class="s">never throws on wire input</text>
+  <text x="636" y="650" class="s">done: chain M1, M4, M6</text>
 
-  <rect x="910" y="370" width="270" height="150" class="box frt"/>
-  <text x="926" y="396" class="h2">Frontend agent</text>
-  <text x="926" y="416" class="m">frontend/</text>
-  <text x="926" y="438" class="s">rules: common + frontend</text>
-  <text x="926" y="456" class="s">show only decoded values; every</text>
-  <text x="926" y="472" class="s">element handles STALE / NCD / INOP</text>
-  <text x="926" y="500" class="s">done: chain M5 + browser check</text>
+  <rect x="910" y="520" width="270" height="150" class="box frt"/>
+  <text x="926" y="546" class="h2">Frontend agent</text>
+  <text x="926" y="566" class="m">frontend/</text>
+  <text x="926" y="588" class="s">rules: common + frontend</text>
+  <text x="926" y="606" class="s">show only decoded values; every</text>
+  <text x="926" y="622" class="s">element handles STALE / NCD / INOP</text>
+  <text x="926" y="650" class="s">done: chain M5 + browser check</text>
 
   <!-- hand-off -> reviewer -->
-  <path d="M465,520 C 465,560 640,560 660,578" class="flow"/>
-  <path d="M755,520 L755,576" class="flow"/>
-  <path d="M1045,520 C 1045,560 870,560 850,578" class="flow"/>
-  <text x="946" y="600" class="s">hand-off note from each agent:</text>
-  <text x="946" y="616" class="s">changed · contract impact ·</text>
-  <text x="946" y="632" class="s">verified · not verified</text>
+  <path d="M465,670 C 465,710 640,710 660,728" class="flow"/>
+  <path d="M755,670 L755,726" class="flow"/>
+  <path d="M1045,670 C 1045,710 870,710 850,728" class="flow"/>
+  <text x="946" y="750" class="s">hand-off note from each agent:</text>
+  <text x="946" y="766" class="s">changed · contract impact ·</text>
+  <text x="946" y="782" class="s">verified · not verified</text>
 
-  <rect x="580" y="580" width="350" height="72" class="box rev"/>
-  <text x="596" y="606" class="h2">Reviewer agent (read-only)</text>
-  <text x="596" y="626" class="s">checks the combined diff against every rule file;</text>
-  <text x="596" y="642" class="s">findings marked CONFIRMED or PLAUSIBLE; never edits</text>
+  <rect x="580" y="730" width="350" height="72" class="box rev"/>
+  <text x="596" y="756" class="h2">Reviewer agent (read-only)</text>
+  <text x="596" y="776" class="s">checks the combined diff against every rule file;</text>
+  <text x="596" y="792" class="s">findings marked CONFIRMED or PLAUSIBLE; never edits</text>
 
   <!-- gates -->
-  <path d="M755,652 L755,690" class="flow"/>
-  <rect x="330" y="692" width="850" height="88" class="box gate"/>
-  <text x="346" y="716" class="h2">Gates (same commands locally, in the pre-commit hook and in CI)</text>
-  <text x="346" y="740" class="m">node tools/check-ai.mjs</text>
-  <text x="530" y="740" class="s">rules vs code: labels, ports, rates, counts, paths, wrappers</text>
-  <text x="346" y="760" class="m">node tools/check-ownership.mjs</text>
-  <text x="590" y="760" class="s">every changed file has an owner; --agent X fails outside X's paths</text>
-  <text x="346" y="776" class="m"></text>
+  <path d="M755,802 L755,840" class="flow"/>
+  <rect x="330" y="842" width="850" height="88" class="box gate"/>
+  <text x="346" y="866" class="h2">Gates (same commands locally, in the pre-commit hook and in CI)</text>
+  <text x="346" y="890" class="m">node tools/check-ai.mjs</text>
+  <text x="530" y="890" class="s">rules vs code: labels, ports, rates, counts, paths, wrappers</text>
+  <text x="346" y="910" class="m">node tools/check-ownership.mjs</text>
+  <text x="590" y="910" class="s">every changed file has an owner; --agent X fails outside X's paths</text>
+  <text x="346" y="926" class="m"></text>
 
   <!-- commit + CI -->
-  <path d="M755,780 L755,812" class="flow"/>
-  <rect x="330" y="814" width="400" height="66" class="box neu"/>
-  <text x="346" y="838" class="h3">Commit (commit-and-review skill)</text>
-  <text x="346" y="858" class="s">feature branch · one imperative sentence · explicit paths</text>
-  <text x="346" y="873" class="s">push only when you ask · merge to sandbox is your call</text>
+  <path d="M755,930 L755,962" class="flow"/>
+  <rect x="330" y="964" width="400" height="66" class="box neu"/>
+  <text x="346" y="988" class="h3">Commit (commit-and-review skill)</text>
+  <text x="346" y="1008" class="s">feature branch · one imperative sentence · explicit paths</text>
+  <text x="346" y="1023" class="s">push only when you ask · merge to sandbox is your call</text>
 
-  <path d="M730,847 L778,847" class="flow"/>
-  <rect x="780" y="814" width="400" height="66" class="box gate"/>
-  <text x="796" y="838" class="h3">CI · .github/workflows/ci.yml</text>
-  <text x="796" y="858" class="s">framework: check-ai + ownership · test: npm test, M1 M4 M5 M6</text>
-  <text x="796" y="873" class="s">firmware: apt Arm GCC + QEMU, M0 M2 M7</text>
+  <path d="M730,997 L778,997" class="flow"/>
+  <rect x="780" y="964" width="400" height="66" class="box gate"/>
+  <text x="796" y="988" class="h3">CI · .github/workflows/ci.yml</text>
+  <text x="796" y="1008" class="s">framework: check-ai + ownership · test: npm test, M1 M4 M5 M6</text>
+  <text x="796" y="1023" class="s">firmware: apt Arm GCC + QEMU, M0 M2 M7</text>
 
   <!-- knowledge refs -->
-  <path d="M290,262 L328,262" class="ref"/>
-  <path d="M290,440 L328,440" class="ref"/>
-  <text x="30" y="690" class="h3">Rule of thumb</text>
-  <text x="30" y="710" class="s">One layer, no contract change:</text>
-  <text x="30" y="726" class="s">straight to that layer's agent.</text>
-  <text x="30" y="750" class="s">Contract or several layers:</text>
-  <text x="30" y="766" class="s">integrator plans and splits it.</text>
-  <text x="30" y="790" class="s">Reopening a recorded decision:</text>
-  <text x="30" y="806" class="s">ask the user first.</text>
-  <text x="30" y="830" class="s">Missing toolchain locally:</text>
-  <text x="30" y="846" class="s">SKIP here, CI is the evidence.</text>
+  <path d="M290,300 L328,300" class="ref"/>
+  <path d="M290,590 L328,590" class="ref"/>
+  <text x="30" y="840" class="h3">Rule of thumb</text>
+  <text x="30" y="860" class="s">One layer, no contract change:</text>
+  <text x="30" y="876" class="s">straight to that layer's agent.</text>
+  <text x="30" y="900" class="s">Contract or several layers:</text>
+  <text x="30" y="916" class="s">integrator plans and splits it.</text>
+  <text x="30" y="940" class="s">Reopening a recorded decision:</text>
+  <text x="30" y="956" class="s">ask the user first.</text>
+  <text x="30" y="980" class="s">Missing toolchain locally:</text>
+  <text x="30" y="996" class="s">SKIP here, CI is the evidence.</text>
 </svg>
