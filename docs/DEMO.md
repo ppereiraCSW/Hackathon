@@ -125,7 +125,7 @@ node tools/decode-capture.mjs shared/capture.a429   # decode a recording offline
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `No joystick found` | pad not plugged in, or not a WinMM device | `powershell -File host/test-pad.ps1` to inspect; use `--no-pad` |
+| `No joystick found` | pad not plugged in, or seen by neither HID nor WinMM | `powershell -File host/test-pad.ps1` to inspect; use `--no-pad` |
 | pad visible but axes frozen | another app grabbed it, or it is asleep | move it; replug |
 | SFD shows NO DATA | backend running but QEMU not connected | check port 5555 is free; restart |
 | all parameters STALE | firmware died | check the QEMU line in the terminal |

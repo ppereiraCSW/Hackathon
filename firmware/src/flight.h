@@ -101,6 +101,10 @@ static inline float wrap_360(float d) {
 #define BTN_LB_CAS_DOWN  0x0004u
 #define BTN_RB_CAS_UP    0x0008u
 #define BTN_START_FREEZE 0x0010u
+_Static_assert(BTN_A_LEVEL == BTN_A && BTN_B_RESET_HDG == BTN_B &&
+                   BTN_LB_CAS_DOWN == BTN_LB && BTN_RB_CAS_UP == BTN_RB &&
+                   BTN_START_FREEZE == BTN_START,
+               "flight.h button masks must match pad.h");
 #define POV_UP           0
 #define POV_DOWN         18000
 

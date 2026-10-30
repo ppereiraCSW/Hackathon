@@ -63,7 +63,7 @@ const out = cases.map((c) => {
 const doc = {
   version: 1,
   comment:
-    'Hand-computed ARINC 429 golden vectors. Every word here was derived twice: by backend/src/a429/codec.js and by an independent handEncode() in tools/gen-vectors.mjs. The C encoder in frontend... firmware must reproduce bytesLE exactly.',
+    'Hand-computed ARINC 429 golden vectors. Every word here was derived twice: by backend/src/a429/codec.js and by an independent handEncode() in tools/gen-vectors.mjs. The C encoder in firmware/src/a429.h must reproduce bytesLE exactly.',
   ssm: SSM,
   vectors: out,
 };

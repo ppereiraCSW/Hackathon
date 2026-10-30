@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "comment": "Single source of truth for the A429 label set. Read by the backend (JS) and generated into C by firmware/build.mjs. Label values are OCTAL, as ARINC 429 labels are numbered.",
+  "comment": "Single source of truth for the A429 label set. Read by the backend (JS) at start-up and mirrored by hand in firmware/src/flight.h (LBL_* and LSB_* defines). Label values are OCTAL, as ARINC 429 labels are numbered.",
   "sdi": 0,
   "labels": [
     {
