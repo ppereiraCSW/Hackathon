@@ -161,18 +161,13 @@ static inline void flight_transmit(const flight_state_t *s, uint32_t base) {
     };
 
     for (int i = 0; i < 6; i++) {
-        uint32_t mag;
-        uint8_t ssm;
+        uint32_t mag = 0;
+        uint8_t ssm = A429_SSM_PLUS;
 
         if (s->freeze) {
-            /* Deliberate NCD: demonstrates the validity path end to end. */
-            a429_encode_value(0.0f, 1.0f, -1.0f, 1.0f, &mag, &ssm);
+            /* Deliberate NCD on every label: one button demonstrates the whole
+             * validity path, firmware -> A429 -> backend -> SFD annunciation. */
             ssm = A429_SSM_NCD;
-            mag = 0;
-        } else if (defs[i].label == LBL_BARO_ALT) {
-            /* baro altitude is unsigned in engineering terms here but A429 BNR
-             * needs a sign for values below sea level; encodeValue handles it. */
-            a429_encode_value(defs[i].value, defs[i].lsb, defs[i].vmin, defs[i].vmax, &mag, &ssm);
         } else {
             a429_encode_value(defs[i].value, defs[i].lsb, defs[i].vmin, defs[i].vmax, &mag, &ssm);
         }

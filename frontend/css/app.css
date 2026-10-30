@@ -1,0 +1,196 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #111820;
+  --line: #1e2a36;
+  --ink: #d7e3ef;
+  --dim: #7d8fa1;
+  --ok: #3ddc84;
+  --warn: #ffc857;
+  --bad: #ff5c5c;
+  --a429: #4fc3f7;
+  --accent: #7ee0ff;
+  --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.dim { color: var(--dim); }
+.ok { color: var(--ok); }
+.inop { color: var(--warn); }
+.stale { color: var(--bad); }
+
+/* ---------------------------------------------------------------- config */
+.config-page header {
+  padding: 28px 32px 20px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #0f1620, var(--bg));
+}
+.config-page h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.config-page .lede {
+  margin: 0 0 10px;
+  max-width: 78ch;
+  color: var(--dim);
+  font-size: 14px;
+}
+.config-page .links { margin: 0; font-size: 14px; }
+.config-page .links a { color: var(--accent); text-decoration: none; }
+.config-page .links a:hover { text-decoration: underline; }
+
+.config-page main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 28px;
+  padding: 24px 32px 60px;
+  align-items: start;
+}
+
+.slider-list { display: grid; gap: 14px; }
+
+.param {
+  display: grid;
+  grid-template-columns: 190px 130px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: border-color 120ms, background 120ms;
+}
+.param.rejected { border-color: var(--bad); background: #1d1114; }
+
+.param-name strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.param-name span { font-size: 12px; }
+
+.param-live {
+  font-family: var(--mono);
+  font-size: 14px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.param-controls { display: grid; gap: 6px; }
+
+.ctl {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 72px;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--dim);
+}
+.ctl output {
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ctl-check {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #263442;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--a429);
+  border: 2px solid #0b0f14;
+  cursor: grab;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--a429);
+  border: 2px solid #0b0f14;
+  cursor: grab;
+}
+
+button.reset {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dim);
+  background: #16202b;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+}
+button.reset:hover { color: var(--ink); border-color: var(--a429); }
+
+.health {
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  position: sticky;
+  top: 24px;
+}
+.health h2 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.health dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.health dt { color: var(--dim); }
+.health dd {
+  margin: 0;
+  font-family: var(--mono);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fatal {
+  margin: 20px 32px;
+  padding: 14px;
+  border: 1px solid var(--bad);
+  border-radius: 6px;
+  color: var(--bad);
+  white-space: pre-wrap;
+}

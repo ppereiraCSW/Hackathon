@@ -1,0 +1,224 @@
+/* Secondary Flight Display layout */
+
+.sfd-page {
+  --panel-edge: #2b3a49;
+  overflow: hidden;
+}
+
+.sfd {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(240px, 0.65fr) minmax(0, 1.3fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "adi hdg hdg"
+    "adi tapes status";
+  gap: 14px;
+  height: 100vh;
+  padding: 14px;
+  background: radial-gradient(circle at 50% 0%, #131c26 0%, #0b0f14 70%);
+}
+
+.instr {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+/* ------------------------------------------------------------------- ADI */
+.adi-panel {
+  grid-area: adi;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px;
+}
+#adi {
+  width: auto;
+  height: 100%;
+  max-height: calc(100vh - 120px);
+  max-width: 100%;
+  display: block;
+  aspect-ratio: 1 / 1;
+}
+.adi-readouts { display: flex; gap: 18px; width: 100%; justify-content: center; }
+.readout {
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+.readout b { color: var(--ink); font-size: 15px; margin-left: 6px; }
+
+/* ----------------------------------------------------------------- tapes */
+.tape-col {
+  grid-area: tapes;
+  display: grid;
+  grid-template-columns: 1fr 0.85fr 1.05fr;
+  gap: 8px;
+  padding: 8px;
+  min-height: 0;
+}
+.tape {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: #0d141c;
+  border: 1px solid #1b2733;
+  border-radius: 7px;
+  padding: 6px 4px;
+  overflow: hidden;
+  min-height: 0;
+}
+.tape canvas {
+  display: block;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.tape-title {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tape-title .unit { text-transform: none; letter-spacing: 0; }
+.tape-value {
+  font-family: var(--mono);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: #060a0e;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  padding: 1px 7px;
+  min-width: 86%;
+  text-align: center;
+}
+.tape-value.small { font-size: 14px; }
+.tape-flag {
+  position: absolute;
+  inset: 40% 4px auto 4px;
+  display: none;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #0b0f14;
+  background: var(--warn);
+  border-radius: 3px;
+  padding: 2px 0;
+}
+.tape.failed .tape-flag { display: block; }
+.tape.failed .tape-value { color: var(--warn); }
+.tape.stale .tape-flag { display: block; background: var(--bad); color: #0b0f14; }
+.tape.hidden-param { opacity: 0.28; }
+
+/* --------------------------------------------------------------- heading */
+.hdg-panel {
+  grid-area: hdg;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  position: relative;
+  padding: 10px 18px 8px;
+  min-height: 0;
+}
+#cv-hdg { width: 100%; height: clamp(70px, 11vh, 130px); display: block; }
+.hdg-value {
+  font-family: var(--mono);
+  font-size: clamp(20px, 2.8vh, 30px);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: #060a0e;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  padding: 0 14px;
+  margin-top: -6px;
+}
+.hdg-value .unit { font-size: 15px; color: var(--dim); }
+.hdg-panel .tape-flag { inset: 34% 25% auto 25%; }
+
+/* ---------------------------------------------------------------- status */
+.status-panel {
+  grid-area: status;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 10px 26px;
+  font-size: 12px;
+  align-self: stretch;
+  overflow: auto;
+}
+.status-panel .annun {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.status-panel .hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  align-self: end;
+}
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 9px;
+  background: #0d141c;
+  border: 1px solid #1b2733;
+  border-radius: 5px;
+}
+.status-row .tag {
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+}
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: #263442;
+  color: var(--ink);
+}
+.badge.ok { background: var(--ok); color: #06210f; }
+.badge.inop { background: var(--warn); color: #241a00; }
+.badge.stale { background: var(--bad); color: #2a0505; }
+
+.annun { min-height: 20px; border-top: 1px solid var(--line); padding-top: 6px; }
+.annun-list {
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  font-family: var(--mono);
+  color: var(--warn);
+}
+.hint { font-size: 11px; margin: 6px 0 0; }
+.hint a { color: var(--accent); }
+
+@media (max-width: 1100px) {
+  .sfd {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "hdg hdg"
+      "adi tapes"
+      "status status";
+    height: auto;
+  }
+  #adi { height: auto; max-height: 46vh; }
+  .tape canvas { min-height: 220px; }
+}

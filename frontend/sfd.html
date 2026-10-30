@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Secondary Flight Display</title>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/sfd.css">
+</head>
+<body class="sfd-page">
+<main class="sfd" role="application" aria-label="Secondary Flight Display">
+
+  <!-- ============================================ attitude + heading cluster -->
+  <section class="instr adi-panel" aria-label="Attitude director indicator">
+    <svg id="adi" viewBox="0 0 320 320" role="img" aria-label="Attitude">
+      <defs>
+        <clipPath id="adi-clip"><circle cx="160" cy="160" r="150"/></clipPath>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2a7fd4"/>
+          <stop offset="100%" stop-color="#6fb6ea"/>
+        </linearGradient>
+        <linearGradient id="gnd" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#a9762f"/>
+          <stop offset="100%" stop-color="#6d4718"/>
+        </linearGradient>
+      </defs>
+      <g clip-path="url(#adi-clip)">
+        <g id="adi-world">
+          <rect x="-200" y="-400" width="720" height="560" fill="url(#sky)"/>
+          <rect x="-200" y="160" width="720" height="560" fill="url(#gnd)"/>
+          <line x1="-200" y1="160" x2="520" y2="160" stroke="#fff" stroke-width="2"/>
+          <g id="ladder" stroke="#fff" stroke-width="1.6" fill="#fff"
+             font-family="ui-monospace, monospace" font-size="11"></g>
+        </g>
+      </g>
+      <!-- fixed aircraft symbol -->
+      <g stroke="#ffcc00" stroke-width="4" fill="none" stroke-linecap="round">
+        <line x1="70" y1="160" x2="128" y2="160"/>
+        <line x1="192" y1="160" x2="250" y2="160"/>
+        <circle cx="160" cy="160" r="4" fill="#ffcc00"/>
+      </g>
+      <circle cx="160" cy="160" r="150" fill="none" stroke="#2b3a49" stroke-width="3"/>
+    </svg>
+
+    <div class="adi-readouts">
+      <span id="r-pitch" class="readout">PITCH <b>—</b></span>
+      <span id="r-roll" class="readout">ROLL <b>—</b></span>
+    </div>
+  </section>
+
+  <!-- =============================================================== tapes -->
+  <section class="instr tape-col" aria-label="Speed and altitude tapes">
+    <div class="tape" id="tape-cas">
+      <div class="tape-title">CAS <span class="unit">kt</span></div>
+      <canvas id="cv-cas" width="120" height="380"></canvas>
+      <div class="tape-value"><b id="v-cas">—</b></div>
+      <div class="tape-flag" id="f-cas">INOP</div>
+    </div>
+
+    <div class="tape tape-vs" id="tape-vs">
+      <div class="tape-title">V/S <span class="unit">ft/min</span></div>
+      <canvas id="cv-vs" width="104" height="380"></canvas>
+      <div class="tape-value small"><b id="v-vs">—</b></div>
+      <div class="tape-flag" id="f-vs">INOP</div>
+    </div>
+
+    <div class="tape" id="tape-alt">
+      <div class="tape-title">BARO ALT <span class="unit">ft</span></div>
+      <canvas id="cv-alt" width="132" height="380"></canvas>
+      <div class="tape-value"><b id="v-alt">—</b></div>
+      <div class="tape-flag" id="f-alt">INOP</div>
+    </div>
+  </section>
+
+  <!-- ============================================================= heading -->
+  <section class="instr hdg-panel" aria-label="Heading">
+    <canvas id="cv-hdg" width="320" height="86"></canvas>
+    <div class="hdg-value"><b id="v-hdg">—</b><span class="unit">°</span></div>
+    <div class="tape-flag" id="f-hdg">INOP</div>
+  </section>
+
+  <!-- ============================================================== status -->
+  <section class="instr status-panel" aria-label="System status">
+    <div class="status-row">
+      <span class="tag">A429</span>
+      <span id="s-bus" class="badge inop">NO DATA</span>
+    </div>
+    <div class="status-row">
+      <span class="tag">words</span><span id="s-words" class="mono">0</span>
+    </div>
+    <div class="status-row">
+      <span class="tag">parity</span><span id="s-parity" class="mono">0</span>
+    </div>
+    <div class="status-row">
+      <span class="tag">labels</span><span id="s-labels" class="mono">0/6</span>
+    </div>
+    <div class="status-row annun" id="s-annun">
+      <span id="a-list" class="annun-list">—</span>
+    </div>
+    <p class="hint dim">Configured in the backend — <a href="/config" target="_blank" rel="noopener">sliders</a></p>
+  </section>
+
+</main>
+
+<script type="module" src="/js/sfd.js"></script>
+</body>
+</html>

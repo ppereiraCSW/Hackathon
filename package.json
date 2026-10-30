@@ -1,0 +1,21 @@
+{
+  "name": "avionics-pipeline",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gamepad -> QEMU bare-metal Cortex-M3 -> ARINC 429 -> backend -> Secondary Flight Display",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node tools/run-all.mjs",
+    "start:replay": "node tools/run-all.mjs --replay",
+    "firmware": "node firmware/build.mjs --entry main",
+    "vectors": "node tools/gen-vectors.mjs",
+    "capture": "node tools/capture.mjs 6",
+    "test": "node --test test/*.test.mjs",
+    "test:a429": "node --test test/a429.test.mjs",
+    "test:state": "node --test test/state.test.mjs",
+    "test:e2e": "node --test test/e2e.test.mjs"
+  }
+}

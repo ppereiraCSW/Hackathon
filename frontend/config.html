@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Backend — display configuration</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="config-page">
+<header>
+  <h1>Backend <span class="dim">/ display configuration</span></h1>
+  <p class="lede">
+    One slider per parameter received over ARINC&nbsp;429. The sliders configure
+    <strong>how the SFD displays</strong> each parameter — the range mapped onto the
+    instrument and whether it is shown. They never change the value coming from the
+    embedded layer.
+  </p>
+  <p class="links">
+    <a href="/sfd" target="_blank" rel="noopener">Open the SFD &rarr;</a>
+    <span id="link-state" class="dim">connecting…</span>
+  </p>
+</header>
+
+<main>
+  <div id="sliders" class="slider-list" aria-live="polite"></div>
+
+  <section class="health" aria-label="A429 bus health">
+    <h2>ARINC 429 bus</h2>
+    <dl>
+      <dt>words decoded</dt><dd id="h-words">—</dd>
+      <dt>parity errors</dt><dd id="h-parity">—</dd>
+      <dt>unknown labels</dt><dd id="h-unknown">—</dd>
+      <dt>resyncs</dt><dd id="h-resync">—</dd>
+      <dt>uptime</dt><dd id="h-uptime">—</dd>
+    </dl>
+  </section>
+</main>
+
+<script type="module" src="/js/config.js"></script>
+</body>
+</html>
