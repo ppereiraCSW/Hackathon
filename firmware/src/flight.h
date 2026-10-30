@@ -17,7 +17,7 @@
  *   derived          -> baro altitude integrated from vertical speed
  *
  * Buttons: A = wings level (roll and pitch to 0), B held 1 s = reset heading,
- * LB/RB = CAS -/+10 kt, D-pad up/down = altitude +/-500 ft,
+ * LB/RB = CAS -/+10 kt, D-pad up/down = altitude +/-500 ft per press,
  * START = freeze (all labels -> NCD).
  */
 #ifndef FLIGHT_H
@@ -70,6 +70,7 @@ typedef struct {
     uint8_t freeze;       /* 1 = report NCD on every label */
     uint32_t tick;
     uint32_t prev_buttons;
+    int16_t prev_pov;     /* D-pad on the previous step, for edge detection */
 } flight_state_t;
 
 static inline void flight_init(flight_state_t *s) {
@@ -83,6 +84,7 @@ static inline void flight_init(flight_state_t *s) {
     s->freeze = 0;
     s->tick = 0;
     s->prev_buttons = 0;
+    s->prev_pov = -1;
 }
 
 static inline float wrap_360(float d) {
@@ -168,13 +170,19 @@ static inline void flight_step(flight_state_t *s, const pad_state_t *pad) {
     if (pressed & BTN_START_FREEZE) {
         s->freeze = !s->freeze;
     }
-    if (pad->pov == POV_UP) {
-        s->baro_alt_ft += 500.0f;
-        if (s->baro_alt_ft > 100000.0f) s->baro_alt_ft = 100000.0f;
-    } else if (pad->pov == POV_DOWN) {
-        s->baro_alt_ft -= 500.0f;
-        if (s->baro_alt_ft < -1000.0f) s->baro_alt_ft = -1000.0f;
+    /* D-pad: one 500 ft step per press. Level-triggered it stepped on every
+     * 50 Hz tick while held, i.e. 25,000 ft/s, so a short tap jumped thousands
+     * of feet. */
+    if (pad->pov != s->prev_pov) {
+        if (pad->pov == POV_UP) {
+            s->baro_alt_ft += 500.0f;
+            if (s->baro_alt_ft > 100000.0f) s->baro_alt_ft = 100000.0f;
+        } else if (pad->pov == POV_DOWN) {
+            s->baro_alt_ft -= 500.0f;
+            if (s->baro_alt_ft < -1000.0f) s->baro_alt_ft = -1000.0f;
+        }
     }
+    s->prev_pov = pad->pov;
 }
 
 /* Transmit all six labels once, one word each, in a fixed order. */

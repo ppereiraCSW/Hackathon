@@ -173,6 +173,15 @@ async function main() {
         console.log(`  ${casOk ? 'PASS' : 'FAIL'}  CAS rate                   +${casUp.toFixed(1)} kt in 1 s  want ~25`);
         results.push(casOk);
 
+        // ---- D-pad up held 1 s steps altitude once (+500), not on every tick
+        const altBefore = values().BARO_ALT;
+        v = await hold({ pov: 0 }, 1000);
+        await hold({}, 100);
+        const altStep = values().BARO_ALT - altBefore;
+        const povOk = Math.abs(altStep - 500) <= 20;
+        console.log(`  ${povOk ? 'PASS' : 'FAIL'}  D-pad held: one step       +${altStep.toFixed(0)} ft  want 500`);
+        results.push(povOk);
+
         // ---- vertical speed up 2.5 s at 1000 fpm/s -> +2000
         v = await hold({ r: 65535 }, 2500);
         results.push(expect('VS full up -> limit', v.VERT_SPEED, 2000, 40));
