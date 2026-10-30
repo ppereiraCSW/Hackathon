@@ -1,0 +1,19 @@
+# Dependencies and generated output — never commit these.
+node_modules/
+package-lock.json
+
+# Runtime artefacts
+*.log
+data/
+coverage/
+.env
+.env.*
+
+# OS noise
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Firmware build output
+firmware/build/
+build/

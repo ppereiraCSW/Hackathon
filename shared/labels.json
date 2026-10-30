@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "comment": "Single source of truth for the A429 label set. Read by the backend (JS) and generated into C by firmware/build.mjs. Label values are OCTAL, as ARINC 429 labels are numbered.",
+  "sdi": 0,
+  "labels": [
+    {
+      "label": "324",
+      "tag": "PITCH",
+      "unit": "deg",
+      "lsbPerBit": 0.0439453125,
+      "lsbNote": "180/4096 -- exactly representable, 12-bit magnitude over +-180 deg",
+      "min": -180,
+      "max": 180,
+      "display": { "min": -20, "max": 20, "visible": true }
+    },
+    {
+      "label": "325",
+      "tag": "ROLL",
+      "unit": "deg",
+      "lsbPerBit": 0.0439453125,
+      "lsbNote": "180/4096",
+      "min": -180,
+      "max": 180,
+      "display": { "min": -45, "max": 45, "visible": true }
+    },
+    {
+      "label": "314",
+      "tag": "HEADING",
+      "unit": "deg",
+      "lsbPerBit": 0.0439453125,
+      "lsbNote": "180/4096",
+      "min": 0,
+      "max": 360,
+      "display": { "min": 0, "max": 360, "visible": true }
+    },
+    {
+      "label": "204",
+      "tag": "BARO_ALT",
+      "unit": "ft",
+      "lsbPerBit": 4,
+      "lsbNote": "4 ft/bit, the classic ARINC 429 baro-corrected altitude resolution",
+      "min": -1000,
+      "max": 100000,
+      "display": { "min": 0, "max": 30000, "visible": true }
+    },
+    {
+      "label": "206",
+      "tag": "CAS",
+      "unit": "kt",
+      "lsbPerBit": 0.125,
+      "lsbNote": "1/8 kt per bit",
+      "min": 0,
+      "max": 600,
+      "display": { "min": 0, "max": 250, "visible": true }
+    },
+    {
+      "label": "212",
+      "tag": "VERT_SPEED",
+      "unit": "ft/min",
+      "lsbPerBit": 1,
+      "lsbNote": "1 ft/min per bit",
+      "min": -32000,
+      "max": 32000,
+      "display": { "min": -2000, "max": 2000, "visible": true }
+    }
+  ]
+}

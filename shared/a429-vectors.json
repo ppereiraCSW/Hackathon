@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "comment": "Hand-computed ARINC 429 golden vectors. Every word here was derived twice: by backend/src/a429/codec.js and by an independent handEncode() in tools/gen-vectors.mjs. The C encoder in frontend... firmware must reproduce bytesLE exactly.",
+  "ssm": {
+    "PLUS": 0,
+    "NCD": 1,
+    "TEST": 2,
+    "MINUS": 3
+  },
+  "vectors": [
+    {
+      "name": "pitch_zero",
+      "label": "324",
+      "sdi": 0,
+      "magnitude": 0,
+      "ssm": 0,
+      "labelOct": 212,
+      "word": 2147483691,
+      "wordHex": "0x8000002B",
+      "bytesLE": [
+        43,
+        0,
+        0,
+        128
+      ]
+    },
+    {
+      "name": "pitch_pos_10deg",
+      "label": "324",
+      "sdi": 0,
+      "magnitude": 228,
+      "ssm": 0,
+      "labelOct": 212,
+      "word": 2147717163,
+      "wordHex": "0x8003902B",
+      "bytesLE": [
+        43,
+        144,
+        3,
+        128
+      ]
+    },
+    {
+      "name": "pitch_neg_10deg",
+      "label": "324",
+      "sdi": 0,
+      "magnitude": 228,
+      "ssm": 3,
+      "labelOct": 212,
+      "word": 3758329899,
+      "wordHex": "0xE003902B",
+      "bytesLE": [
+        43,
+        144,
+        3,
+        224
+      ]
+    },
+    {
+      "name": "roll_pos_45deg",
+      "label": "325",
+      "sdi": 0,
+      "magnitude": 1024,
+      "ssm": 0,
+      "labelOct": 213,
+      "word": 2148532395,
+      "wordHex": "0x801000AB",
+      "bytesLE": [
+        171,
+        0,
+        16,
+        128
+      ]
+    },
+    {
+      "name": "heading_270deg",
+      "label": "314",
+      "sdi": 0,
+      "magnitude": 6144,
+      "ssm": 0,
+      "labelOct": 204,
+      "word": 2153775155,
+      "wordHex": "0x80600033",
+      "bytesLE": [
+        51,
+        0,
+        96,
+        128
+      ]
+    },
+    {
+      "name": "baro_alt_30000ft",
+      "label": "204",
+      "sdi": 0,
+      "magnitude": 7500,
+      "ssm": 0,
+      "labelOct": 132,
+      "word": 7680033,
+      "wordHex": "0x00753021",
+      "bytesLE": [
+        33,
+        48,
+        117,
+        0
+      ]
+    },
+    {
+      "name": "cas_120kt",
+      "label": "206",
+      "sdi": 0,
+      "magnitude": 960,
+      "ssm": 0,
+      "labelOct": 134,
+      "word": 983137,
+      "wordHex": "0x000F0061",
+      "bytesLE": [
+        97,
+        0,
+        15,
+        0
+      ]
+    },
+    {
+      "name": "vs_neg_1500fpm",
+      "label": "212",
+      "sdi": 0,
+      "magnitude": 1500,
+      "ssm": 3,
+      "labelOct": 138,
+      "word": 3759632465,
+      "wordHex": "0xE0177051",
+      "bytesLE": [
+        81,
+        112,
+        23,
+        224
+      ]
+    },
+    {
+      "name": "vs_ncd",
+      "label": "212",
+      "sdi": 0,
+      "magnitude": 0,
+      "ssm": 1,
+      "labelOct": 138,
+      "word": 2684354641,
+      "wordHex": "0xA0000051",
+      "bytesLE": [
+        81,
+        0,
+        0,
+        160
+      ]
+    },
+    {
+      "name": "pitch_test",
+      "label": "324",
+      "sdi": 0,
+      "magnitude": 100,
+      "ssm": 2,
+      "labelOct": 212,
+      "word": 3221327915,
+      "wordHex": "0xC001902B",
+      "bytesLE": [
+        43,
+        144,
+        1,
+        192
+      ]
+    },
+    {
+      "name": "sdi_3_case",
+      "label": "206",
+      "sdi": 3,
+      "magnitude": 800,
+      "ssm": 0,
+      "labelOct": 134,
+      "word": 2148303713,
+      "wordHex": "0x800C8361",
+      "bytesLE": [
+        97,
+        131,
+        12,
+        128
+      ]
+    }
+  ]
+}
