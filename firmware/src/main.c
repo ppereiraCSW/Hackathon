@@ -1,7 +1,7 @@
 /*
  * Bare-metal firmware for the ARM MPS2 AN385 under QEMU.
  *
- *   UART1 RX : 12-byte pad frames from host/pad-reader.ps1  (50 Hz)
+ *   UART1 RX : 17-byte pad frames from host/pad-reader.ps1  (50 Hz)
  *   UART0 TX : ARINC 429 words, 4 bytes little-endian each, 6 labels per tick
  *
  * Timebase: the Cortex-M3 SysTick counter, polled. No interrupts, no RTOS --

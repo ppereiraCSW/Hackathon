@@ -7,7 +7,7 @@ measured rather than assumed.
 
 ```
   USB gamepad                host/pad-reader.ps1                 QEMU guest
-  (DirectInput)  --WinMM-->  poll 50 Hz, normalise,  -->  TCP :5556  -->  UART1 RX
+  (DirectInput)  --HID---->  poll 50 Hz, normalise,  -->  TCP :5556  -->  UART1 RX
                              frame + XOR checksum                      |
                                                                        v
                                                         bare-metal Cortex-M3 firmware
@@ -91,7 +91,8 @@ words. It is A429 at the word level.
 ```
 A5 5A | seq:u16 | X Y Z R : u16×4 | buttons:u16 | pov:i16 | xor:u8     (17 bytes)
 ```
-Axes are WinMM's raw 0..65535 with 32767 at centre; the firmware normalises with a
+Axes use WinMM's 0..65535 convention with 32767 at centre (the HID path rescales
+to it); the firmware normalises with a
 6% deadzone and rescales so full travel remains usable.
 
 ## 4. The gamepad constraint that shaped the design
@@ -113,11 +114,19 @@ impossible. Revised mapping (operator decision, 2026-10-30):
 | X | roll | ±45° |
 | Y | pitch | ±20° (back = up) |
 | Z | calibrated airspeed | 0…250 kt |
-| R | vertical speed | ±2000 ft/min |
+| R | — (unused since `6f1ebd3`) | |
+| *derived* | vertical speed | airspeed × sin(pitch), ±6000 ft/min |
 | *derived* | heading | integrated from bank as a coordinated turn |
-| *derived* | baro altitude | integrated from vertical speed |
+| *derived* | baro altitude | integrated from vertical speed, 0 (ground) … 41,000 ft |
 
-Buttons do trim/reset/step; START toggles an all-labels **NCD** freeze, which is a
+Since commit `2b808bb` the axes are **rate commands**: deflection sets how fast
+the value moves (roll 30°/s, pitch 10°/s, CAS 25 kt/s) and a centred stick holds
+it. The ranges above are the limits. V/S was the R axis until `6f1ebd3`; it is now
+derived from pitch so that attitude, V/S and altitude always agree. On the ground
+the aircraft is on its wheels: wings level, brakes, rotation at 130 kt.
+
+Buttons level the wings, reset heading (1 s hold, because the pad auto-fires B),
+and step CAS/altitude; START toggles an all-labels **NCD** freeze, which is a
 one-button demo of the entire validity path.
 
 Because heading and altitude are integrated in the firmware, the **backend's "no
@@ -146,7 +155,8 @@ and only measuring the output rate reveals it.
 | System | `test/e2e.test.mjs` (6) | live TCP ingest, SSE, stale-on-silence, **decoupled replay** |
 | Visual | browser run | the SFD renders and responds |
 
-Total: **38 automated tests** (`npm test`) plus the 12-check pad-path proof.
+Total: **38 automated tests** (`npm test`) plus the 17-check pad-path proof
+and the 10-check keyboard-path proof.
 
 Golden vectors are computed twice — once by the JS codec, once by an independent
 `handEncode()` — and asserted equal. That is what allows the claim "the C encoder

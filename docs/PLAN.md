@@ -145,6 +145,10 @@ whenever a slider changes.
 
 ## 6. Repository layout
 
+As planned. The layout that was built is in `README.md`; `tools/qemu.mjs` and
+`docs/ARINC429.md` were never created, and the host reader moved to HID with
+WinMM as fallback.
+
 ```
 firmware/   src/*.c *.h  startup.c  mps2-an385.ld  build.mjs
 host/       pad-reader.ps1        (WinMM → TCP)
@@ -162,7 +166,7 @@ docs/       PLAN.md  ARCHITECTURE.md  ARINC429.md  DEMO.md
 |---|---|---|
 | M0 | Toolchain installed and verified | `arm-none-eabi-gcc --version`, `qemu-system-arm -M help` ✅ done |
 | M1 | A429 codec in JS + hand-computed golden vectors | `node --test test/a429.test.mjs` |
-| M2 | Firmware builds and boots in QEMU; its bytes equal the golden vectors | `node firmware/build.mjs && node tools/qemu.mjs --vectors` |
+| M2 | Firmware builds and boots in QEMU; its bytes equal the golden vectors | `node firmware/build.mjs && node tools/test-pad-path.mjs` (planned as `tools/qemu.mjs --vectors`, never built) |
 | M3 | Pad reader streams live axes over TCP | `host/pad-reader.ps1 -Echo` |
 | M4 | Backend decodes, converts, watches freshness, serves API | `node --test` + `/api/health` |
 | M5 | SFD page + config page with 6 sliders | both pages open, slider changes the SFD mapping |

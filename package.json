@@ -8,14 +8,22 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node tools/run-all.mjs",
-    "start:replay": "node tools/run-all.mjs --replay",
+    "start": "node tools/start.mjs",
+    "start:gamepad": "node tools/start.mjs gamepad",
+    "start:keyboard": "node tools/start.mjs keyboard",
+    "start:demo": "node tools/start.mjs demo",
+    "start:replay": "node tools/start.mjs replay",
+    "stop": "node tools/start.mjs stop",
     "firmware": "node firmware/build.mjs --entry main",
     "vectors": "node tools/gen-vectors.mjs",
     "capture": "node tools/capture.mjs 6",
     "test": "node --test test/*.test.mjs",
     "test:a429": "node --test test/a429.test.mjs",
     "test:state": "node --test test/state.test.mjs",
-    "test:e2e": "node --test test/e2e.test.mjs"
+    "test:e2e": "node --test test/e2e.test.mjs",
+    "chain": "node tools/chain.mjs",
+    "check:ai": "node tools/check-ai.mjs",
+    "check:ownership": "node tools/check-ownership.mjs",
+    "hooks:install": "git config core.hooksPath .githooks"
   }
 }

@@ -15,27 +15,34 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
+// Defaults are the winget install locations on the Windows dev machine.
+// ARM_TOOLCHAIN_BIN / QEMU_BIN override them (CI on Linux: /usr/bin).
 export const TOOLCHAIN_BIN =
+    process.env.ARM_TOOLCHAIN_BIN ??
     'C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\14.2 rel1\\bin';
-export const QEMU_BIN = 'C:\\Program Files\\qemu';
+export const QEMU_BIN = process.env.QEMU_BIN ?? 'C:\\Program Files\\qemu';
+
+const EXE = process.platform === 'win32' ? '.exe' : '';
 
 export function gccPath() {
-    const exe = join(TOOLCHAIN_BIN, 'arm-none-eabi-gcc.exe');
-    if (!existsSync(exe)) throw new Error(`ARM GCC not found at ${exe}`);
+    const exe = join(TOOLCHAIN_BIN, `arm-none-eabi-gcc${EXE}`);
+    if (!existsSync(exe)) throw new Error(`ARM GCC not found at ${exe} (set ARM_TOOLCHAIN_BIN)`);
     return exe;
 }
 
 export function qemuPath() {
-    const exe = join(QEMU_BIN, 'qemu-system-arm.exe');
-    if (!existsSync(exe)) throw new Error(`QEMU not found at ${exe}`);
+    const exe = join(QEMU_BIN, `qemu-system-arm${EXE}`);
+    if (!existsSync(exe)) throw new Error(`QEMU not found at ${exe} (set QEMU_BIN)`);
     return exe;
 }
 
-/** Toolchain include dir, needed for stdint.h. */
-function toolchainInclude() {
+/**
+ * Toolchain include dir for stdint.h. The Arm GNU release ships it next to bin/;
+ * distro packages (apt gcc-arm-none-eabi) find it on their own, so it is optional.
+ */
+function toolchainIncludeArgs() {
     const inc = join(TOOLCHAIN_BIN, '..', 'arm-none-eabi', 'include');
-    if (!existsSync(inc)) throw new Error(`toolchain include dir not found: ${inc}`);
-    return inc;
+    return existsSync(inc) ? [`-I${inc}`] : [];
 }
 
 const FLAGS = [
@@ -73,7 +80,7 @@ export function build({ entry = 'main', outDir = join(here, 'build'), quiet = fa
         [
             ...FLAGS,
             `-I${join(here, 'src')}`,
-            `-I${toolchainInclude()}`,
+            ...toolchainIncludeArgs(),
             `-T${join(here, 'mps2-an385.ld')}`,
             '-Wl,--gc-sections',
             '-nostartfiles',
@@ -93,7 +100,7 @@ export function build({ entry = 'main', outDir = join(here, 'build'), quiet = fa
     );
 
     // size report
-    const size = join(TOOLCHAIN_BIN, 'arm-none-eabi-size.exe');
+    const size = join(TOOLCHAIN_BIN, `arm-none-eabi-size${EXE}`);
     const sizeOut = execFileSync(size, [elf], { encoding: 'utf8' });
     log(sizeOut.trim());
 

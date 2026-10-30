@@ -94,7 +94,7 @@ typedef struct {
     uint8_t freeze;       /* 1 = report NCD on every label */
     uint32_t tick;
     uint32_t prev_buttons;
-    int16_t prev_pov;
+    int16_t prev_pov;     /* D-pad on the previous step, for edge detection */
 } flight_state_t;
 
 static inline void flight_init(flight_state_t *s) {
@@ -127,6 +127,10 @@ static inline float wrap_360(float d) {
 #define BTN_LB_CAS_DOWN  0x0004u
 #define BTN_RB_CAS_UP    0x0008u
 #define BTN_START_FREEZE 0x0010u
+_Static_assert(BTN_A_LEVEL == BTN_A && BTN_B_RESET_HDG == BTN_B &&
+                   BTN_LB_CAS_DOWN == BTN_LB && BTN_RB_CAS_UP == BTN_RB &&
+                   BTN_START_FREEZE == BTN_START,
+               "flight.h button masks must match pad.h");
 #define POV_UP           0
 #define POV_DOWN         18000
 
@@ -212,14 +216,17 @@ static inline void flight_step(flight_state_t *s, const pad_state_t *pad) {
     if (pressed & BTN_START_FREEZE) {
         s->freeze = !s->freeze;
     }
-    /* D-pad steps once per press; level-triggered it added 500 ft every tick. */
-    int16_t pov_pressed = pad->pov != s->prev_pov ? pad->pov : -1;
-    s->prev_pov = pad->pov;
-    if (pov_pressed == POV_UP) {
-        s->baro_alt_ft = clampf(s->baro_alt_ft + 500.0f, ALT_GROUND_FT, ALT_CEILING_FT);
-    } else if (pov_pressed == POV_DOWN) {
-        s->baro_alt_ft = clampf(s->baro_alt_ft - 500.0f, ALT_GROUND_FT, ALT_CEILING_FT);
+    /* D-pad: one 500 ft step per press. Level-triggered it stepped on every
+     * 50 Hz tick while held, i.e. 25,000 ft/s, so a short tap jumped thousands
+     * of feet. Held between the ground and the ceiling, like the climb. */
+    if (pad->pov != s->prev_pov) {
+        if (pad->pov == POV_UP) {
+            s->baro_alt_ft = clampf(s->baro_alt_ft + 500.0f, ALT_GROUND_FT, ALT_CEILING_FT);
+        } else if (pad->pov == POV_DOWN) {
+            s->baro_alt_ft = clampf(s->baro_alt_ft - 500.0f, ALT_GROUND_FT, ALT_CEILING_FT);
+        }
     }
+    s->prev_pov = pad->pov;
 }
 
 /* Transmit all six labels once, one word each, in a fixed order. */

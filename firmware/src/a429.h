@@ -1,8 +1,9 @@
 /*
  * ARINC 429 word encoder -- bare-metal C mirror of backend/src/a429/codec.js.
  *
- * The two implementations must produce identical bytes; that equality is what
- * tools/qemu.mjs --vectors proves against shared/a429-vectors.json.
+ * The two implementations must produce identical bytes. The JS side is pinned
+ * to shared/a429-vectors.json by test/a429.test.mjs; tools/test-pad-path.mjs
+ * runs this encoder in QEMU and decodes its output with the JS codec.
  */
 #ifndef A429_H
 #define A429_H

@@ -1,0 +1,42 @@
+{
+  "comment": "Single source of truth for which agent owns which paths. A path ending in / is a directory prefix; anything else is an exact file. The longest matching entry wins, so test/a429.test.mjs belongs to backend while the rest of test/ belongs to integrator. Checked by tools/check-ai.mjs and tools/check-ownership.mjs.",
+  "agents": {
+    "integrator": {
+      "layer": "contracts and glue",
+      "owns": [
+        "shared/",
+        "tools/",
+        "test/",
+        "docs/",
+        "ai/",
+        ".claude/",
+        ".github/",
+        ".githooks/",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "README.md",
+        "BRIEF.md",
+        "package.json",
+        "start.cmd",
+        ".gitignore",
+        "Hackathon_Humans_X_AI 1.pptx"
+      ]
+    },
+    "embedded": {
+      "layer": "embedded",
+      "owns": ["firmware/", "host/"]
+    },
+    "backend": {
+      "layer": "backend",
+      "owns": ["backend/", "test/a429.test.mjs", "test/state.test.mjs"]
+    },
+    "frontend": {
+      "layer": "frontend",
+      "owns": ["frontend/"]
+    },
+    "reviewer": {
+      "layer": "review (read-only)",
+      "owns": []
+    }
+  }
+}

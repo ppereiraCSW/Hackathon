@@ -31,11 +31,12 @@ typedef struct {
     uint8_t got_frame; /* 1 once a valid frame has ever been parsed */
 } pad_state_t;
 
-/* Button bit masks as the host reader reports them (WinMM order). */
-#define BTN_BASE  0x0001u /* A */
-#define BTN_RB    0x0002u /* B */
-#define BTN_LB    0x0004u /* LB */
-#define BTN_RT    0x0008u /* RB in WinMM numbering, see host/README */
+/* Button bit masks as the host reader reports them. flight.h acts on them
+ * under its own names (BTN_A_LEVEL ...); the values must stay equal. */
+#define BTN_A     0x0001u
+#define BTN_B     0x0002u
+#define BTN_LB    0x0004u
+#define BTN_RB    0x0008u
 #define BTN_START 0x0010u
 
 static inline float pad_axis_norm(uint16_t raw) {

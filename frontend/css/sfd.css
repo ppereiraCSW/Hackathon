@@ -1,6 +1,9 @@
 /* Secondary Flight Display: airliner standby-instrument look. */
 
 .sfd-page {
+  /* B612 (Airbus's cockpit typeface) when installed locally; nothing is
+   * fetched from a CDN (ai/rules/frontend.md), so otherwise the stacks fall
+   * back to the app fonts. */
   --cockpit: "B612", var(--sans);
   --cockpit-mono: "B612 Mono", var(--mono);
   --amber: #ffb000;
